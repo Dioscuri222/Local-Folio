@@ -188,6 +188,26 @@
       animation: t-panel-enter var(--duration-fast) var(--ease-smooth-out) both;
     }
 
+    @keyframes progress-stripe-move {
+      from { background-position: 0 0; }
+      to { background-position: 28px 0; }
+    }
+
+    .progress-bar-running {
+      background-image: linear-gradient(
+        -45deg,
+        rgba(255, 255, 255, 0.22) 25%,
+        transparent 25%,
+        transparent 50%,
+        rgba(255, 255, 255, 0.22) 50%,
+        rgba(255, 255, 255, 0.22) 75%,
+        transparent 75%,
+        transparent
+      );
+      background-size: 28px 28px;
+      animation: progress-stripe-move 900ms linear infinite;
+    }
+
     .card-elevated {
       box-shadow: var(--shadow-card);
     }
@@ -319,8 +339,9 @@
           <i id="theme-icon" data-lucide="moon" class="w-4 h-4"></i>
         </button>
 
-        <button id="open-settings-btn" type="button" class="inline-flex items-center justify-center min-h-[40px] min-w-[40px] rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] hover:border-[var(--accent)] text-[var(--ink-secondary)] hover:text-[var(--accent)] transition-colors" title="Settings" aria-label="Open Settings">
+        <button id="open-settings-btn" type="button" class="relative inline-flex items-center justify-center min-h-[40px] min-w-[40px] rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] hover:border-[var(--accent)] text-[var(--ink-secondary)] hover:text-[var(--accent)] transition-colors" title="Settings &amp; Live Progress" aria-label="Open Settings">
           <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+          <span id="settings-running-dot" class="hidden absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[var(--accent)]"></span>
         </button>
 
         <a href="https://github.com/Dioscuri222/Local-Folio" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center min-h-[40px] min-w-[40px] rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] hover:border-[var(--border-strong)] text-[var(--ink-secondary)] hover:text-[var(--ink-primary)] transition-colors" title="Local-Folio GitHub" aria-label="View on GitHub">
@@ -835,6 +856,29 @@
         </div>
 
         <div class="space-y-3.5 text-xs text-[var(--ink-secondary)]">
+          <!-- Priority Top: Live Process & Progress Monitor -->
+          <div class="p-4 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-strong)] space-y-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2 min-w-0">
+                <span id="settings-progress-dot" class="w-2.5 h-2.5 rounded-full bg-[var(--border-strong)] shrink-0"></span>
+                <span id="settings-progress-title" class="font-semibold text-[var(--ink-primary)] truncate">Status: Standby</span>
+              </div>
+              <div class="flex items-center gap-2 font-mono text-[11px] shrink-0">
+                <span id="settings-progress-elapsed" class="text-[var(--ink-muted)]">00:00</span>
+                <span id="settings-progress-pct" class="font-semibold text-[var(--accent)]">0%</span>
+              </div>
+            </div>
+
+            <div class="w-full h-2.5 rounded-full bg-[var(--bg-panel)] border border-[var(--border-hairline)] overflow-hidden">
+              <div id="settings-progress-bar" class="h-full w-0 bg-[var(--accent)] rounded-full transition-all duration-300"></div>
+            </div>
+
+            <div class="flex items-center justify-between gap-2 text-[11px]">
+              <span id="settings-progress-detail" class="text-[var(--ink-muted)] truncate">Belum ada proses yang berjalan</span>
+              <span id="settings-progress-counts" class="font-mono text-[var(--ink-secondary)] shrink-0">0/0</span>
+            </div>
+          </div>
+
           <div class="p-3.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] space-y-2.5">
             <div class="flex items-center justify-between gap-3">
               <div>
@@ -994,6 +1038,66 @@
         ta.remove();
       }
     }
+    // ── Live Progress Monitor (Top of Settings Drawer) ───────────────────────
+    let progressTimerId = null;
+    let progressStartedAt = null;
+    let pdfIsRunning = false;
+
+    function formatElapsed(ms) {
+      const totalSec = Math.max(0, Math.floor(ms / 1000));
+      const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
+      const s = String(totalSec % 60).padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    function updateSettingsProgress({ active, title, detail, pct, counts, indeterminate = false }) {
+      const dot = document.getElementById('settings-progress-dot');
+      const titleEl = document.getElementById('settings-progress-title');
+      const detailEl = document.getElementById('settings-progress-detail');
+      const pctEl = document.getElementById('settings-progress-pct');
+      const countsEl = document.getElementById('settings-progress-counts');
+      const bar = document.getElementById('settings-progress-bar');
+      const elapsedEl = document.getElementById('settings-progress-elapsed');
+      const headerDot = document.getElementById('settings-running-dot');
+
+      if (!bar) return;
+
+      if (titleEl) titleEl.textContent = title;
+      if (detailEl) detailEl.textContent = detail;
+      if (countsEl) countsEl.textContent = counts;
+      const safePct = Math.max(0, Math.min(100, Math.round(pct)));
+      if (pctEl) pctEl.textContent = indeterminate ? '...' : `${safePct}%`;
+      bar.style.width = indeterminate ? '100%' : `${safePct}%`;
+      bar.classList.toggle('progress-bar-running', Boolean(active));
+
+      if (dot) {
+        dot.className = active
+          ? 'w-2.5 h-2.5 rounded-full bg-[var(--accent)] shrink-0'
+          : safePct === 100
+            ? 'w-2.5 h-2.5 rounded-full bg-emerald-600 shrink-0'
+            : 'w-2.5 h-2.5 rounded-full bg-[var(--border-strong)] shrink-0';
+      }
+      if (headerDot) headerDot.classList.toggle('hidden', !active);
+
+      if (active) {
+        if (!progressStartedAt) progressStartedAt = Date.now();
+        if (!progressTimerId) {
+          progressTimerId = setInterval(() => {
+            if (elapsedEl && progressStartedAt) {
+              elapsedEl.textContent = formatElapsed(Date.now() - progressStartedAt);
+            }
+          }, 500);
+        }
+        if (elapsedEl) elapsedEl.textContent = formatElapsed(Date.now() - progressStartedAt);
+      } else {
+        if (progressTimerId) { clearInterval(progressTimerId); progressTimerId = null; }
+        if (elapsedEl && progressStartedAt) {
+          elapsedEl.textContent = formatElapsed(Date.now() - progressStartedAt);
+        }
+        progressStartedAt = null;
+      }
+    }
+
     function showToast(message, type = 'info') {
       const container = document.getElementById('toast-container');
       const toast = document.createElement('div');
@@ -1194,6 +1298,14 @@
           batchSpinner.classList.remove('hidden');
           item.status = 'converting';
           updateUI();
+          const doneNow = fileQueue.filter(i => i.status === 'done' || i.status === 'error').length;
+          updateSettingsProgress({
+            active: true,
+            title: 'Berjalan: MarkItDown',
+            detail: `Memproses ${item.file.name}`,
+            pct: Math.max(8, (doneNow / fileQueue.length) * 100),
+            counts: `${doneNow}/${fileQueue.length}`
+          });
           try {
             item.markdown = await convertFileToMarkdown(item);
             item.status = 'done';
@@ -1206,6 +1318,16 @@
       } finally {
         isProcessing = false;
         batchSpinner.classList.add('hidden');
+        if (fileQueue.length > 0) {
+          const doneAll = fileQueue.filter(i => i.status === 'done').length;
+          updateSettingsProgress({
+            active: false,
+            title: 'Selesai: MarkItDown',
+            detail: `${doneAll} dari ${fileQueue.length} file berhasil dikonversi`,
+            pct: 100,
+            counts: `${doneAll}/${fileQueue.length}`
+          });
+        }
       }
     }
 
@@ -1363,6 +1485,14 @@
           item.status = 'processing';
           item.errorMsg = '';
           updateOcrUI();
+          const doneNow = ocrQueue.filter(i => i.status === 'done' || i.status === 'error').length;
+          updateSettingsProgress({
+            active: true,
+            title: 'Berjalan: Batch OCR (RapidOCR)',
+            detail: `Membaca teks ${item.file.name}`,
+            pct: Math.max(6, (doneNow / ocrQueue.length) * 100),
+            counts: `${doneNow}/${ocrQueue.length}`
+          });
 
           try {
             const fd = new FormData();
@@ -1388,6 +1518,15 @@
         isOcrProcessing = false;
         ocrBatchSpinner.classList.add('hidden');
         const doneCount = ocrQueue.filter(i => i.status === 'done').length;
+        if (ocrQueue.length > 0) {
+          updateSettingsProgress({
+            active: false,
+            title: 'Selesai: Batch OCR',
+            detail: `${doneCount} dari ${ocrQueue.length} gambar selesai dibaca`,
+            pct: 100,
+            counts: `${doneCount}/${ocrQueue.length}`
+          });
+        }
         if (doneCount > 0) {
           showToast(`Batch OCR complete (${doneCount}/${ocrQueue.length} files)`, 'success');
         }
@@ -1621,7 +1760,16 @@
 
       const runBtn = document.getElementById('pdf-run-btn');
       runBtn.disabled = true;
+      pdfIsRunning = true;
       pdfResultInfo.textContent = 'Memproses secara lokal...';
+      updateSettingsProgress({
+        active: true,
+        title: `Berjalan: ${PDF_TOOLS_META[activePdfTool].title}`,
+        detail: `Memproses ${pdfSelectedFiles.length} file secara lokal...`,
+        pct: 100,
+        counts: `0/${pdfSelectedFiles.length}`,
+        indeterminate: true
+      });
 
       try {
         const fd = new FormData();
@@ -1673,10 +1821,25 @@
           pdfResultInfo.textContent = `Diunduh ${filename} (${formatBytes(blob.size)})`;
         }
         showToast(`Berhasil disimpan: ${filename}`, 'success');
+        updateSettingsProgress({
+          active: false,
+          title: `Selesai: ${PDF_TOOLS_META[activePdfTool].title}`,
+          detail: `Berhasil mengunduh ${filename}`,
+          pct: 100,
+          counts: `${pdfSelectedFiles.length}/${pdfSelectedFiles.length}`
+        });
       } catch (err) {
         pdfResultInfo.textContent = `Error: ${err.message}`;
         showToast(err.message, 'error');
+        updateSettingsProgress({
+          active: false,
+          title: `Gagal: ${PDF_TOOLS_META[activePdfTool].title}`,
+          detail: err.message || 'Proses gagal',
+          pct: 0,
+          counts: `0/${pdfSelectedFiles.length}`
+        });
       } finally {
+        pdfIsRunning = false;
         runBtn.disabled = false;
       }
     }
