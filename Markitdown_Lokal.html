@@ -478,14 +478,14 @@
   </main>
 
   <!-- ═══════════════════════════════════════════════════════════════════════════
-       VIEW 2: LOCAL IMAGE & PDF OCR (RapidOCR — Baidu PaddleOCR ONNX)
+       VIEW 2: LOCAL IMAGE & PDF OCR (Batch RapidOCR — Baidu PaddleOCR ONNX)
   ═══════════════════════════════════════════════════════════════════════════ -->
-  <section id="view-ocr" class="hidden t-view-enter flex-grow w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+  <section id="view-ocr" class="hidden t-view-enter flex-grow w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5">
     <div class="flex flex-wrap items-end justify-between gap-4 border-b border-[var(--border-hairline)] pb-4">
       <div>
-        <h2 class="font-serif text-2xl sm:text-3xl font-bold text-[var(--ink-primary)]">Local Image &amp; Photo OCR</h2>
+        <h2 class="font-serif text-2xl sm:text-3xl font-bold text-[var(--ink-primary)]">Local Batch Image &amp; Photo OCR</h2>
         <p class="text-sm text-[var(--ink-secondary)] mt-1">
-          Drop any photo or scanned PDF anywhere on this tab to extract clean text locally using RapidOCR with automatic rotation detection.
+          Drop 1 or dozens of photos/scanned PDFs anywhere on this tab to extract clean text locally using RapidOCR with automatic rotation detection.
         </p>
       </div>
       <div class="flex items-center gap-2">
@@ -500,32 +500,68 @@
       </div>
     </div>
 
+    <!-- Batch OCR Progress & Actions Bar -->
+    <div id="ocr-batch-bar" class="hidden rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] p-3.5 space-y-2.5">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2.5">
+          <div id="ocr-batch-spinner" class="animate-spin text-[var(--accent)] hidden">
+            <i data-lucide="loader-2" class="w-4 h-4"></i>
+          </div>
+          <span id="ocr-batch-summary" class="text-xs sm:text-sm font-semibold text-[var(--ink-primary)]">Processed 0 of 0 images</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="ocr-export-zip-btn" type="button" class="inline-flex items-center gap-1.5 min-h-[36px] px-3.5 text-xs font-semibold rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-fg)]">
+            <i data-lucide="archive" class="w-3.5 h-3.5"></i><span>Export All .ZIP</span>
+          </button>
+          <button id="ocr-clear-queue-btn" type="button" class="inline-flex items-center gap-1.5 min-h-[36px] px-3 text-xs font-medium rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-secondary)] hover:text-[var(--crimson)]">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i><span>Clear</span>
+          </button>
+        </div>
+      </div>
+      <div class="w-full bg-[var(--bg-elevated)] h-2 rounded-full overflow-hidden">
+        <div id="ocr-batch-progress" class="bg-[var(--accent)] h-full w-0 transition-all duration-300 rounded-full"></div>
+      </div>
+    </div>
+
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
       <div class="lg:col-span-5 space-y-4">
-        <div id="ocr-drop-zone" role="button" tabindex="0" class="card-elevated border-2 border-dashed border-[var(--border-strong)] hover:border-[var(--accent)] rounded-2xl bg-[var(--bg-panel)] p-8 text-center cursor-pointer transition-colors">
-          <input type="file" id="ocr-file-input" class="hidden" accept=".jpg,.jpeg,.png,.webp,.bmp,.pdf" />
-          <div class="space-y-3 pointer-events-none">
-            <div class="mx-auto w-12 h-12 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--accent)]">
-              <i data-lucide="scan-text" class="w-6 h-6"></i>
+        <div id="ocr-drop-zone" role="button" tabindex="0" class="card-elevated border-2 border-dashed border-[var(--border-strong)] hover:border-[var(--accent)] rounded-2xl bg-[var(--bg-panel)] p-6 text-center cursor-pointer transition-colors">
+          <input type="file" id="ocr-file-input" multiple class="hidden" accept=".jpg,.jpeg,.png,.webp,.bmp,.pdf" />
+          <div class="space-y-2.5 pointer-events-none">
+            <div class="mx-auto w-11 h-11 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--accent)]">
+              <i data-lucide="scan-text" class="w-5 h-5"></i>
             </div>
-            <p class="text-sm font-semibold text-[var(--ink-primary)]">Drop photo anywhere on this tab, or click here</p>
-            <p class="text-xs text-[var(--ink-muted)]">Supports rotated laptop/phone photos (.jpg, .jpeg, .png, .pdf)</p>
+            <p class="text-sm font-semibold text-[var(--ink-primary)]">Drop multiple photos anywhere on this tab, or click here</p>
+            <p class="text-xs text-[var(--ink-muted)]">Unlimited batch OCR (.jpg, .jpeg, .png, .webp, .pdf)</p>
           </div>
         </div>
 
-        <div id="ocr-preview-card" class="hidden rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] p-3.5 space-y-2.5">
-          <div class="flex items-center justify-between text-xs text-[var(--ink-muted)]">
-            <span id="ocr-file-label" class="truncate font-mono text-[var(--ink-primary)]">image.jpg</span>
-            <button id="ocr-rerun-btn" type="button" class="px-3 py-1 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-hairline)] hover:border-[var(--accent)] text-[var(--accent)] font-medium">Re-run OCR</button>
+        <!-- OCR Queue List -->
+        <div id="ocr-queue-wrapper" class="hidden space-y-2">
+          <div class="flex items-center justify-between px-1">
+            <span class="text-xs font-semibold text-[var(--ink-secondary)]">OCR Queue</span>
+            <span id="ocr-queue-count" class="text-xs font-mono px-2 py-0.5 rounded-md bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--accent)]">0</span>
           </div>
-          <img id="ocr-preview-img" alt="Uploaded OCR preview" class="w-full max-h-[340px] object-contain rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-hairline)]" />
+          <div id="ocr-queue-container" class="space-y-1.5 max-h-[260px] overflow-y-auto pr-1"></div>
+        </div>
+
+        <!-- Selected Image Preview -->
+        <div id="ocr-preview-card" class="hidden rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] p-3.5 space-y-2.5">
+          <div class="flex items-center justify-between gap-2 text-xs text-[var(--ink-muted)]">
+            <span id="ocr-file-label" class="truncate font-mono text-[var(--ink-primary)]">image.jpg</span>
+            <button id="ocr-rerun-btn" type="button" class="px-3 py-1 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-hairline)] hover:border-[var(--accent)] text-[var(--accent)] font-medium shrink-0">Re-run OCR</button>
+          </div>
+          <img id="ocr-preview-img" alt="Uploaded OCR preview" class="w-full max-h-[260px] object-contain rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-hairline)]" />
         </div>
       </div>
 
-      <div class="lg:col-span-7 rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] card-elevated overflow-hidden flex flex-col min-h-[480px]">
+      <div class="lg:col-span-7 rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] card-elevated overflow-hidden flex flex-col min-h-[520px] lg:sticky lg:top-20">
         <div class="bg-[var(--bg-elevated)]/80 border-b border-[var(--border-hairline)] px-4 py-3 flex flex-wrap items-center justify-between gap-2">
           <div class="flex items-center gap-2 text-xs">
-            <span class="font-semibold text-[var(--ink-primary)]">Extracted Plain Text</span>
+            <div class="flex items-center bg-[var(--bg-panel)] p-0.5 rounded-xl border border-[var(--border-hairline)]">
+              <button id="ocr-mode-single" type="button" class="min-h-[30px] px-2.5 text-xs font-semibold rounded-lg bg-[var(--bg-elevated)] text-[var(--accent)]">Selected</button>
+              <button id="ocr-mode-combined" type="button" class="min-h-[30px] px-2.5 text-xs font-medium rounded-lg text-[var(--ink-muted)] hover:text-[var(--ink-primary)]">Combined All</button>
+            </div>
             <span id="ocr-meta-badge" class="px-2 py-0.5 rounded-md bg-[var(--bg-panel)] border border-[var(--border-hairline)] text-[var(--accent)] font-mono">Ready</span>
           </div>
           <div class="flex items-center gap-2">
@@ -538,7 +574,7 @@
           </div>
         </div>
         <div class="flex-grow p-4 bg-[var(--bg-canvas)]/50">
-          <textarea id="ocr-output-textarea" placeholder="Extracted text will appear here. You can edit it before copying..." class="w-full h-full min-h-[390px] p-4 rounded-xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] font-mono text-xs text-[var(--ink-primary)] leading-relaxed resize-y"></textarea>
+          <textarea id="ocr-output-textarea" placeholder="Extracted text will appear here. Drop 10-20+ images at once and switch to Combined All to copy everything in one click..." class="w-full h-full min-h-[430px] p-4 rounded-xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] font-mono text-xs text-[var(--ink-primary)] leading-relaxed resize-y"></textarea>
         </div>
       </div>
     </div>
@@ -1144,53 +1180,215 @@
       tabSplitBtn.className = 'hidden md:inline-flex items-center ' + (activeTab === 'split' ? activeCls : inactiveCls);
     }
 
-    // ── VIEW 2: LOCAL RAPIDOCR (IMAGE & PDF -> TEXT) ─────────────────────────
-    let currentOcrFile = null;
+    // ── VIEW 2: LOCAL BATCH RAPIDOCR (UNLIMITED IMAGES & PDF -> TEXT) ────────
+    let ocrQueue = [];
+    let activeOcrId = null;
+    let ocrViewMode = 'single'; // 'single' | 'combined'
+    let isOcrProcessing = false;
+
     const ocrDropZone = document.getElementById('ocr-drop-zone');
     const ocrFileInput = document.getElementById('ocr-file-input');
+    const ocrBatchBar = document.getElementById('ocr-batch-bar');
+    const ocrBatchSpinner = document.getElementById('ocr-batch-spinner');
+    const ocrBatchSummary = document.getElementById('ocr-batch-summary');
+    const ocrBatchProgress = document.getElementById('ocr-batch-progress');
+    const ocrQueueWrapper = document.getElementById('ocr-queue-wrapper');
+    const ocrQueueContainer = document.getElementById('ocr-queue-container');
+    const ocrQueueCount = document.getElementById('ocr-queue-count');
     const ocrPreviewCard = document.getElementById('ocr-preview-card');
     const ocrPreviewImg = document.getElementById('ocr-preview-img');
     const ocrFileLabel = document.getElementById('ocr-file-label');
     const ocrRotateSelect = document.getElementById('ocr-rotate-select');
     const ocrOutputTextarea = document.getElementById('ocr-output-textarea');
     const ocrMetaBadge = document.getElementById('ocr-meta-badge');
+    const ocrModeSingleBtn = document.getElementById('ocr-mode-single');
+    const ocrModeCombinedBtn = document.getElementById('ocr-mode-combined');
 
-    async function runOcrExtraction(file) {
-      if (!file) return;
-      currentOcrFile = file;
-      ocrFileLabel.textContent = `${file.name} (${formatBytes(file.size)})`;
+    function addFilesToOcrQueue(fileList) {
+      const files = Array.from(fileList || []);
+      if (!files.length) return;
+      if (!backendAvailable) {
+        showToast('Run Start_Markitdown.bat for RapidOCR engine', 'warning');
+        return;
+      }
+
+      const newItems = files.map(file => ({
+        id: 'ocr-' + Math.random().toString(36).slice(2, 10),
+        file,
+        previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+        status: 'pending', // 'pending' | 'processing' | 'done' | 'error'
+        text: '',
+        errorMsg: '',
+        lineCount: 0,
+        confidence: 0,
+        rotation: 0
+      }));
+
+      ocrQueue = [...ocrQueue, ...newItems];
+      if (!activeOcrId) activeOcrId = newItems[0].id;
+      if (ocrQueue.length > 1) ocrViewMode = 'combined';
+
+      updateOcrUI();
+      showToast(`Queued ${newItems.length} file${newItems.length > 1 ? 's' : ''} for Batch OCR`, 'info');
+      processOcrQueue();
+    }
+
+    async function processOcrQueue() {
+      if (isOcrProcessing) return;
+      isOcrProcessing = true;
+
+      try {
+        while (true) {
+          const item = ocrQueue.find(i => i.status === 'pending');
+          if (!item) break;
+
+          ocrBatchSpinner.classList.remove('hidden');
+          item.status = 'processing';
+          item.errorMsg = '';
+          updateOcrUI();
+
+          try {
+            const fd = new FormData();
+            fd.append('file', item.file);
+            fd.append('rotate', ocrRotateSelect.value);
+            const res = await fetch(`${API_BASE}/api/ocr`, { method: 'POST', body: fd });
+            const data = await res.json();
+            if (!res.ok || data.error) throw new Error(data.error || `OCR failed (${res.status})`);
+
+            item.text = data.text || '';
+            item.lineCount = data.line_count || 0;
+            item.confidence = data.avg_confidence || 0;
+            item.rotation = data.rotation_applied || 0;
+            item.status = 'done';
+          } catch (err) {
+            item.status = 'error';
+            item.errorMsg = err.message || 'OCR failed';
+          }
+
+          updateOcrUI();
+        }
+      } finally {
+        isOcrProcessing = false;
+        ocrBatchSpinner.classList.add('hidden');
+        const doneCount = ocrQueue.filter(i => i.status === 'done').length;
+        if (doneCount > 0) {
+          showToast(`Batch OCR complete (${doneCount}/${ocrQueue.length} files)`, 'success');
+        }
+      }
+    }
+
+    function getCombinedOcrText() {
+      return ocrQueue
+        .filter(i => i.status === 'done')
+        .map(i => `=== ${i.file.name} ===\n${i.text || '(No text detected)'}`)
+        .join('\n\n');
+    }
+
+    function updateOcrUI() {
+      const hasItems = ocrQueue.length > 0;
+      ocrBatchBar.classList.toggle('hidden', !hasItems);
+      ocrQueueWrapper.classList.toggle('hidden', !hasItems);
+
+      const doneCount = ocrQueue.filter(i => i.status === 'done').length;
+      const pct = hasItems ? Math.round((doneCount / ocrQueue.length) * 100) : 0;
+      ocrBatchSummary.textContent = `Processed ${doneCount} of ${ocrQueue.length} images (${pct}%)`;
+      ocrBatchProgress.style.width = `${pct}%`;
+      ocrQueueCount.textContent = ocrQueue.length;
+
+      // Render Queue List
+      ocrQueueContainer.innerHTML = '';
+      ocrQueue.forEach((item, idx) => {
+        const isActive = item.id === activeOcrId;
+        const edge = item.status === 'done'
+          ? 'border-l-[var(--accent)]'
+          : item.status === 'error'
+            ? 'border-l-[var(--crimson)]'
+            : item.status === 'processing'
+              ? 'border-l-[var(--gold)]'
+              : 'border-l-[var(--border-strong)]';
+        const statusLabel = item.status === 'done'
+          ? `${item.lineCount} lines • ${item.confidence}% • ${item.rotation}°`
+          : item.status === 'processing'
+            ? 'Running RapidOCR...'
+            : item.status === 'error'
+              ? `Error: ${item.errorMsg}`
+              : 'Queued';
+
+        const card = document.createElement('div');
+        card.className = `p-2.5 rounded-xl border border-l-4 ${edge} cursor-pointer flex items-center justify-between gap-2 ${
+          isActive ? 'bg-[var(--bg-elevated)] border-[var(--border-strong)]' : 'bg-[var(--bg-panel)] border-[var(--border-hairline)]'
+        }`;
+        card.innerHTML = `
+          <div class="min-w-0">
+            <div class="text-xs font-semibold text-[var(--ink-primary)] truncate">${idx + 1}. ${escapeHtml(item.file.name)}</div>
+            <div class="text-[11px] font-mono text-[var(--ink-muted)] truncate mt-0.5">${escapeHtml(statusLabel)}</div>
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            <button type="button" data-act="rm" class="p-1 rounded-lg text-[var(--ink-muted)] hover:text-[var(--crimson)]" title="Remove">
+              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>`;
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('button[data-act="rm"]')) {
+            e.stopPropagation();
+            if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+            ocrQueue = ocrQueue.filter(x => x.id !== item.id);
+            if (activeOcrId === item.id) activeOcrId = ocrQueue[0]?.id || null;
+            updateOcrUI();
+            return;
+          }
+          activeOcrId = item.id;
+          ocrViewMode = 'single';
+          updateOcrUI();
+        });
+        ocrQueueContainer.appendChild(card);
+      });
+
+      // Update Mode Tabs
+      const activeCls = 'min-h-[30px] px-2.5 text-xs font-semibold rounded-lg bg-[var(--bg-elevated)] text-[var(--accent)]';
+      const inactiveCls = 'min-h-[30px] px-2.5 text-xs font-medium rounded-lg text-[var(--ink-muted)] hover:text-[var(--ink-primary)]';
+      ocrModeSingleBtn.className = ocrViewMode === 'single' ? activeCls : inactiveCls;
+      ocrModeCombinedBtn.className = ocrViewMode === 'combined' ? activeCls : inactiveCls;
+
+      // Update Preview & Output Textarea
+      const activeItem = ocrQueue.find(i => i.id === activeOcrId) || null;
+      if (!activeItem) {
+        ocrPreviewCard.classList.add('hidden');
+        ocrOutputTextarea.value = '';
+        ocrMetaBadge.textContent = 'Ready';
+        refreshIcons();
+        return;
+      }
+
       ocrPreviewCard.classList.remove('hidden');
-      if (file.type.startsWith('image/')) {
-        ocrPreviewImg.src = URL.createObjectURL(file);
+      ocrFileLabel.textContent = `${activeItem.file.name} (${formatBytes(activeItem.file.size)})`;
+      if (activeItem.previewUrl) {
+        ocrPreviewImg.src = activeItem.previewUrl;
         ocrPreviewImg.classList.remove('hidden');
       } else {
         ocrPreviewImg.classList.add('hidden');
       }
 
-      if (!backendAvailable) {
-        showToast('Run Start_Markitdown.bat for RapidOCR engine', 'warning');
-        ocrMetaBadge.textContent = 'Server offline';
-        return;
+      if (ocrViewMode === 'combined') {
+        const combined = getCombinedOcrText();
+        ocrOutputTextarea.value = combined || (isOcrProcessing ? 'Processing batch OCR...' : '');
+        ocrMetaBadge.textContent = `${doneCount}/${ocrQueue.length} combined`;
+      } else {
+        if (activeItem.status === 'done') {
+          ocrOutputTextarea.value = activeItem.text || '(No text detected)';
+          ocrMetaBadge.textContent = `${activeItem.lineCount} lines • ${activeItem.confidence}% • rot ${activeItem.rotation}°`;
+        } else if (activeItem.status === 'processing') {
+          ocrOutputTextarea.value = 'Extracting text locally with RapidOCR...';
+          ocrMetaBadge.textContent = 'Running RapidOCR...';
+        } else if (activeItem.status === 'error') {
+          ocrOutputTextarea.value = `Error: ${activeItem.errorMsg}`;
+          ocrMetaBadge.textContent = 'Error';
+        } else {
+          ocrOutputTextarea.value = 'Queued for OCR...';
+          ocrMetaBadge.textContent = 'Queued';
+        }
       }
-
-      ocrMetaBadge.textContent = 'Running RapidOCR...';
-      ocrOutputTextarea.value = 'Extracting text locally with RapidOCR (Baidu PaddleOCR ONNX)...';
-
-      try {
-        const fd = new FormData();
-        fd.append('file', file);
-        fd.append('rotate', ocrRotateSelect.value);
-        const res = await fetch(`${API_BASE}/api/ocr`, { method: 'POST', body: fd });
-        const data = await res.json();
-        if (!res.ok || data.error) throw new Error(data.error || `OCR failed (${res.status})`);
-        ocrOutputTextarea.value = data.text || '(No text detected)';
-        ocrMetaBadge.textContent = `${data.line_count} lines • ${data.avg_confidence}% conf • rot ${data.rotation_applied}°`;
-        showToast(`OCR complete (${data.line_count} lines extracted)`, 'success');
-      } catch (err) {
-        ocrOutputTextarea.value = `Error: ${err.message}`;
-        ocrMetaBadge.textContent = 'Error';
-        showToast(err.message, 'error');
-      }
+      refreshIcons();
     }
 
     // ── VIEW 3: LOCAL PDF TOOLKIT (iLovePDF Lokal) ───────────────────────────
@@ -1370,7 +1568,7 @@
 
         const droppedFiles = e.dataTransfer.files;
         if (activeMainView === 'ocr') {
-          runOcrExtraction(droppedFiles[0]);
+          addFilesToOcrQueue(droppedFiles);
         } else if (activeMainView === 'pdf') {
           addFilesToPdfTool(droppedFiles);
         } else {
@@ -1423,17 +1621,52 @@
       tabPreviewBtn.addEventListener('click', () => { activeTab = 'preview'; renderInspector(); });
       tabSplitBtn.addEventListener('click', () => { activeTab = 'split'; renderInspector(); });
 
-      // OCR view
+      // OCR view (Batch RapidOCR)
       ocrDropZone.addEventListener('click', () => ocrFileInput.click());
       ocrDropZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ocrFileInput.click(); } });
-      ocrFileInput.addEventListener('change', e => { if (e.target.files[0]) runOcrExtraction(e.target.files[0]); ocrFileInput.value = ''; });
-      document.getElementById('ocr-rerun-btn').addEventListener('click', () => { if (currentOcrFile) runOcrExtraction(currentOcrFile); });
-      document.getElementById('ocr-copy-btn').addEventListener('click', () => { if (ocrOutputTextarea.value) { copyToClipboard(ocrOutputTextarea.value); showToast('Copied OCR text', 'success'); } });
+      ocrFileInput.addEventListener('change', e => { addFilesToOcrQueue(e.target.files); ocrFileInput.value = ''; });
+      ocrModeSingleBtn.addEventListener('click', () => { ocrViewMode = 'single'; updateOcrUI(); });
+      ocrModeCombinedBtn.addEventListener('click', () => { ocrViewMode = 'combined'; updateOcrUI(); });
+      document.getElementById('ocr-rerun-btn').addEventListener('click', () => {
+        const activeItem = ocrQueue.find(i => i.id === activeOcrId);
+        if (!activeItem) return;
+        activeItem.status = 'pending';
+        updateOcrUI();
+        processOcrQueue();
+      });
+      document.getElementById('ocr-clear-queue-btn').addEventListener('click', () => {
+        ocrQueue.forEach(i => { if (i.previewUrl) URL.revokeObjectURL(i.previewUrl); });
+        ocrQueue = [];
+        activeOcrId = null;
+        updateOcrUI();
+      });
+      document.getElementById('ocr-export-zip-btn').addEventListener('click', async () => {
+        const done = ocrQueue.filter(i => i.status === 'done');
+        if (!done.length) { showToast('No completed OCR files to export', 'warning'); return; }
+        const zip = new JSZip();
+        done.forEach((it, idx) => {
+          const base = it.file.name.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.[^/.]+$/, '') || `image_${idx + 1}`;
+          zip.file(`${base}.txt`, it.text || '');
+        });
+        zip.file('_ALL_COMBINED.txt', getCombinedOcrText());
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(await zip.generateAsync({ type: 'blob' }));
+        a.download = `folio_ocr_batch_${Date.now()}.zip`;
+        a.click();
+        showToast(`Exported ${done.length} OCR text files as .ZIP`, 'success');
+      });
+      document.getElementById('ocr-copy-btn').addEventListener('click', () => {
+        if (ocrOutputTextarea.value) { copyToClipboard(ocrOutputTextarea.value); showToast('Copied OCR text', 'success'); }
+      });
       document.getElementById('ocr-download-txt-btn').addEventListener('click', () => {
         if (!ocrOutputTextarea.value) return;
+        const activeItem = ocrQueue.find(i => i.id === activeOcrId);
+        const filename = ocrViewMode === 'combined'
+          ? `folio_ocr_combined_${Date.now()}.txt`
+          : (((activeItem?.file.name || 'ocr_output').replace(/\.[^/.]+$/, '')) + '.txt');
         const a = document.createElement('a');
         a.href = URL.createObjectURL(new Blob([ocrOutputTextarea.value], { type: 'text/plain;charset=utf-8' }));
-        a.download = ((currentOcrFile?.name || 'ocr_output').replace(/\.[^/.]+$/, '')) + '.txt';
+        a.download = filename;
         a.click();
       });
 
