@@ -29,7 +29,17 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Original-Size", "X-Compressed-Size", "X-Page-Count", "X-OCR-Pages", "X-Digital-Pages", "Content-Disposition"],
+    expose_headers=[
+        "X-Original-Size",
+        "X-Compressed-Size",
+        "X-Page-Count",
+        "X-OCR-Pages",
+        "X-Digital-Pages",
+        "X-Redaction-Count",
+        "X-Diff-Added",
+        "X-Diff-Removed",
+        "Content-Disposition",
+    ],
 )
 
 # Thread-safe live job progress & cancellation registry
@@ -1024,6 +1034,24 @@ async def pdf_ocr_download(
     except Exception as exc:
         _job_finish(job_id, "error", str(exc))
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+# Register all extended PDF & Office tools (Watermark, Page Numbers, Crop, Redact, Repair,
+# Organize, Sign, Compare, PDF<->Word/PPTX/Excel, HTML->PDF, PDF/A, AI Summarizer, Workflow)
+from pdf_extended_routes import build_extended_pdf_router
+
+app.include_router(
+    build_extended_pdf_router(
+        job_init=_job_init,
+        job_update=_job_update,
+        job_check_cancel=_job_check_cancel,
+        job_finish=_job_finish,
+        job_cancelled_exc=JobCancelledError,
+        parse_page_ranges=parse_page_ranges,
+        iter_pdf_pages_pil=iter_pdf_pages_pil,
+        run_rapidocr_on_image=run_rapidocr_on_image,
+    )
+)
 
 
 if __name__ == "__main__":
