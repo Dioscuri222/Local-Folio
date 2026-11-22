@@ -31,19 +31,19 @@ pip install -r requirements.txt
 ## Running the App
 
 ### Windows (One-Click)
-Double-click **`Start_Markitdown.bat`** — this starts the local FastAPI server and opens `http://127.0.0.1:8765` in your browser.
+Double-click **`local-folio.bat`** — this starts the local FastAPI server and opens `http://127.0.0.1:8765` in your browser.
 
 ### Command Line (Windows / macOS / Linux)
 ```bash
-python markitdown_server.py
+python local_folio_server.py
 ```
 Then open **[http://127.0.0.1:8765](http://127.0.0.1:8765)** in your browser.
 
 ## Project Structure
 
-- `markitdown_server.py` — Local FastAPI backend (Markdown conversion, RapidOCR, and PDF toolkit APIs).
-- `Markitdown_Lokal.html` — Single-file frontend UI with Expanding Label tab navigation.
-- `Start_Markitdown.bat` — Windows launcher script.
+- `local_folio_server.py` — Local FastAPI backend (Markdown conversion, RapidOCR, and PDF toolkit APIs).
+- `local-folio.html` — Single-file frontend UI with Expanding Label tab navigation, full-tab drag-and-drop, and live progress monitor.
+- `local-folio.bat` — Windows launcher script.
 - `requirements.txt` — Python dependencies installed from PyPI.
 
 ## Credits & Open-Source Attribution

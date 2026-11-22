@@ -17,7 +17,7 @@ from pypdf import PdfReader, PdfWriter
 from rapidocr_onnxruntime import RapidOCR
 
 APP_DIR = Path(__file__).resolve().parent
-HTML_PATH = APP_DIR / "Markitdown_Lokal.html"
+HTML_PATH = APP_DIR / "local-folio.html"
 
 app = FastAPI(title="Local-Folio — Local PDF, OCR & Markdown Suite")
 
@@ -199,7 +199,7 @@ def parse_page_ranges(range_str: str, total_pages: int) -> List[int]:
 @app.get("/")
 async def serve_frontend():
     if not HTML_PATH.exists():
-        raise HTTPException(status_code=404, detail="Markitdown_Lokal.html not found")
+        raise HTTPException(status_code=404, detail="local-folio.html not found")
     return FileResponse(HTML_PATH)
 
 
@@ -392,7 +392,7 @@ async def pdf_merge(files: List[UploadFile] = File(...)):
             out,
             media_type="application/pdf",
             headers={
-                "Content-Disposition": 'attachment; filename="folio_merged.pdf"',
+                "Content-Disposition": 'attachment; filename="local-folio_merged.pdf"',
                 "X-Page-Count": str(len(writer.pages)),
             },
         )
@@ -583,7 +583,7 @@ async def pdf_from_images(files: List[UploadFile] = File(...)):
             out,
             media_type="application/pdf",
             headers={
-                "Content-Disposition": 'attachment; filename="folio_images.pdf"',
+                "Content-Disposition": 'attachment; filename="local-folio_images.pdf"',
                 "X-Page-Count": str(len(pil_images)),
             },
         )

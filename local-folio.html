@@ -985,7 +985,7 @@
         }
       } catch (_) {}
       backendAvailable = false;
-      if (txt) txt.textContent = 'Browser Fallback Only (Start_Markitdown.bat)';
+      if (txt) txt.textContent = 'Browser Fallback Only (local-folio.bat)';
     }
 
     // ── #5 Expanding Label Tab Switcher ──────────────────────────────────────
@@ -1230,7 +1230,7 @@
         return data.markdown;
       }
 
-      if (item.url) throw new Error('Run Start_Markitdown.bat to extract URLs.');
+      if (item.url) throw new Error('Run local-folio.bat to extract URLs.');
       const file = item.file;
       const ext = file.name.split('.').pop().toLowerCase();
       let bodyMd = '';
@@ -1276,7 +1276,7 @@
     }
 
     function addUrlToQueue(url) {
-      if (!backendAvailable) { showToast('Start local server (Start_Markitdown.bat) for URL extraction', 'warning'); return; }
+      if (!backendAvailable) { showToast('Start local server (local-folio.bat) for URL extraction', 'warning'); return; }
       const item = {
         id: 'u-' + Math.random().toString(36).slice(2, 10),
         file: { name: url, size: 0, type: 'text/uri-list' },
@@ -1447,7 +1447,7 @@
       const files = Array.from(fileList || []);
       if (!files.length) return;
       if (!backendAvailable) {
-        showToast('Run Start_Markitdown.bat for RapidOCR engine', 'warning');
+        showToast('Run local-folio.bat for RapidOCR engine', 'warning');
         return;
       }
 
@@ -1754,7 +1754,7 @@
     }
 
     async function runActivePdfTool() {
-      if (!backendAvailable) { showToast('Jalankan Start_Markitdown.bat untuk memakai PDF Tools lokal', 'warning'); return; }
+      if (!backendAvailable) { showToast('Jalankan local-folio.bat untuk memakai PDF Tools lokal', 'warning'); return; }
       if (!pdfSelectedFiles.length) { showToast('Pilih file terlebih dahulu', 'warning'); return; }
       if (activePdfTool === 'merge' && pdfSelectedFiles.length < 2) { showToast('Pilih minimal 2 file PDF untuk digabungkan', 'warning'); return; }
 
@@ -1805,7 +1805,7 @@
         const blob = await res.blob();
         const disp = res.headers.get('Content-Disposition') || '';
         const match = disp.match(/filename="([^"]+)"/);
-        const filename = match ? match[1] : `folio_${activePdfTool}.pdf`;
+        const filename = match ? match[1] : `local-folio_${activePdfTool}.pdf`;
 
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
@@ -1927,7 +1927,7 @@
         done.forEach((it, idx) => zip.file((it.file.name.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.[^/.]+$/, '') || `file_${idx+1}`) + '.md', it.markdown));
         const a = document.createElement('a');
         a.href = URL.createObjectURL(await zip.generateAsync({ type: 'blob' }));
-        a.download = `folio_local_${Date.now()}.zip`;
+        a.download = `local-folio_markdown_${Date.now()}.zip`;
         a.click();
       });
       document.getElementById('copy-md-btn').addEventListener('click', () => {
@@ -1977,7 +1977,7 @@
         zip.file('_ALL_COMBINED.txt', getCombinedOcrText());
         const a = document.createElement('a');
         a.href = URL.createObjectURL(await zip.generateAsync({ type: 'blob' }));
-        a.download = `folio_ocr_batch_${Date.now()}.zip`;
+        a.download = `local-folio_ocr_batch_${Date.now()}.zip`;
         a.click();
         showToast(`Exported ${done.length} OCR text files as .ZIP`, 'success');
       });
@@ -1988,7 +1988,7 @@
         if (!ocrOutputTextarea.value) return;
         const activeItem = ocrQueue.find(i => i.id === activeOcrId);
         const filename = ocrViewMode === 'combined'
-          ? `folio_ocr_combined_${Date.now()}.txt`
+          ? `local-folio_ocr_combined_${Date.now()}.txt`
           : (((activeItem?.file.name || 'ocr_output').replace(/\.[^/.]+$/, '')) + '.txt');
         const a = document.createElement('a');
         a.href = URL.createObjectURL(new Blob([ocrOutputTextarea.value], { type: 'text/plain;charset=utf-8' }));
