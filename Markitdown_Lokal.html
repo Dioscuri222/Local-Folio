@@ -1,0 +1,1482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Folio-Local | Local PDF, RapidOCR &amp; MarkItDown Studio</title>
+
+  <!-- Google Fonts: Cormorant Garamond, Outfit & IBM Plex Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Outfit', 'system-ui', '-apple-system', 'sans-serif'],
+            serif: ['Cormorant Garamond', 'Georgia', 'serif'],
+            mono: ['IBM Plex Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Client-Side Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://unpkg.com/turndown/dist/turndown.js"></script>
+  <script src="https://unpkg.com/turndown-plugin-gfm/dist/turndown-plugin-gfm.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    :root {
+      /* transitions-dev motion tokens */
+      --duration-quick: 150ms;
+      --duration-fast: 250ms;
+      --duration-medium: 340ms;
+      --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+      /* Default Theme: Cafe Latte (Light Warm Brown - WCAG AA verified) */
+      --bg-canvas: #f6f1ea;
+      --bg-panel: #fffcf7;
+      --bg-elevated: #efe6da;
+      --border-hairline: #e2d5c3;
+      --border-strong: #c5b095;
+      --ink-primary: #2a1c14;
+      --ink-secondary: #543f31;
+      --ink-muted: #6b5342;
+      --accent: #8f4f24;
+      --accent-hover: #753f1b;
+      --accent-fg: #fffcf7;
+      --accent-soft: rgba(143, 79, 36, 0.11);
+      --gold: #a67844;
+      --gold-soft: rgba(166, 120, 68, 0.12);
+      --crimson: #b83333;
+      --crimson-soft: rgba(184, 51, 51, 0.10);
+      --shadow-card: 0 12px 32px -12px rgba(42, 28, 20, 0.10), 0 2px 6px -2px rgba(42, 28, 20, 0.05);
+    }
+
+    html.dark {
+      /* Dark Theme: Espresso Roast (WCAG AA verified) */
+      --bg-canvas: #16110d;
+      --bg-panel: #201813;
+      --bg-elevated: #2b211a;
+      --border-hairline: #3d3026;
+      --border-strong: #594739;
+      --ink-primary: #f7f0e8;
+      --ink-secondary: #d6c6b6;
+      --ink-muted: #b5a18e;
+      --accent: #dda068;
+      --accent-hover: #e6b07d;
+      --accent-fg: #1a120c;
+      --accent-soft: rgba(221, 160, 104, 0.14);
+      --gold: #c99a62;
+      --gold-soft: rgba(201, 154, 98, 0.12);
+      --crimson: #f06a6a;
+      --crimson-soft: rgba(240, 106, 106, 0.12);
+      --shadow-card: 0 14px 36px -12px rgba(0, 0, 0, 0.45);
+    }
+
+    body {
+      font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg-canvas);
+      color: var(--ink-primary);
+      transition: background-color 180ms ease, color 180ms ease;
+    }
+
+    /* ── #5 Expanding Label Tab Bar (transitions-dev tokens) ── */
+    .t-expanding-bar {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px;
+      border-radius: 9999px;
+      background-color: var(--bg-elevated);
+      border: 1px solid var(--border-hairline);
+    }
+
+    .t-expanding-tab {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 36px;
+      padding: 0 11px;
+      border-radius: 9999px;
+      border: 1px solid transparent;
+      color: var(--ink-muted);
+      background: transparent;
+      cursor: pointer;
+      transition:
+        background-color var(--duration-fast) var(--ease-smooth-out),
+        border-color var(--duration-fast) var(--ease-smooth-out),
+        color var(--duration-quick) var(--ease-smooth-out),
+        padding var(--duration-medium) var(--ease-smooth-out);
+    }
+
+    .t-expanding-tab:hover:not([aria-selected="true"]) {
+      color: var(--ink-primary);
+      background-color: var(--bg-panel);
+    }
+
+    .t-expanding-tab[aria-selected="true"] {
+      padding: 0 15px 0 13px;
+      background-color: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .t-expanding-label-wrap {
+      display: grid;
+      grid-template-columns: 0fr;
+      overflow: hidden;
+      transition:
+        grid-template-columns var(--duration-medium) var(--ease-smooth-out),
+        margin-left var(--duration-medium) var(--ease-smooth-out);
+      margin-left: 0;
+    }
+
+    .t-expanding-tab[aria-selected="true"] .t-expanding-label-wrap {
+      grid-template-columns: 1fr;
+      margin-left: 7px;
+    }
+
+    .t-expanding-label {
+      min-width: 0;
+      white-space: nowrap;
+      font-size: 12px;
+      font-weight: 600;
+      opacity: 0;
+      transform: translateX(-6px);
+      filter: blur(2px);
+      transition:
+        opacity var(--duration-fast) var(--ease-smooth-out),
+        transform var(--duration-medium) var(--ease-smooth-out),
+        filter var(--duration-fast) var(--ease-smooth-out);
+    }
+
+    .t-expanding-tab[aria-selected="true"] .t-expanding-label {
+      opacity: 1;
+      transform: translateX(0);
+      filter: blur(0);
+    }
+
+    /* View panel entrance */
+    @keyframes t-panel-enter {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+        filter: blur(2px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+        filter: blur(0);
+      }
+    }
+
+    .t-view-enter {
+      animation: t-panel-enter var(--duration-fast) var(--ease-smooth-out) both;
+    }
+
+    .card-elevated {
+      box-shadow: var(--shadow-card);
+    }
+
+    .cafe-aura {
+      background:
+        radial-gradient(620px 320px at 50% 40%, var(--accent-soft), transparent 72%),
+        radial-gradient(420px 240px at 54% 62%, var(--gold-soft), transparent 75%);
+    }
+
+    a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 9999px; }
+
+    .drag-active {
+      border-color: var(--accent) !important;
+      background-color: var(--accent-soft) !important;
+    }
+
+    .prose-custom {
+      color: var(--ink-primary);
+      line-height: 1.72;
+      font-size: 0.94rem;
+      overflow-wrap: anywhere;
+    }
+    .prose-custom h1, .prose-custom h2, .prose-custom h3 {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      color: var(--ink-primary);
+      margin-top: 1.3em;
+      margin-bottom: 0.5em;
+      font-weight: 700;
+    }
+    .prose-custom h1:first-child, .prose-custom h2:first-child { margin-top: 0; }
+    .prose-custom h1 { font-size: 1.8rem; border-bottom: 1px solid var(--border-hairline); padding-bottom: 0.25em; }
+    .prose-custom h2 { font-size: 1.4rem; border-bottom: 1px solid var(--border-hairline); padding-bottom: 0.2em; }
+    .prose-custom p { margin-bottom: 0.95em; }
+    .prose-custom ul, .prose-custom ol { padding-left: 1.5em; margin-bottom: 0.95em; }
+    .prose-custom ul { list-style-type: disc; }
+    .prose-custom ol { list-style-type: decimal; }
+    .prose-custom code {
+      font-family: 'IBM Plex Mono', monospace;
+      background-color: var(--bg-elevated);
+      border: 1px solid var(--border-hairline);
+      padding: 0.12em 0.4em;
+      border-radius: 6px;
+      font-size: 0.84em;
+      color: var(--accent);
+    }
+    .prose-custom pre {
+      background-color: var(--bg-elevated);
+      padding: 1em;
+      border-radius: 10px;
+      overflow-x: auto;
+      margin-bottom: 1em;
+      border: 1px solid var(--border-hairline);
+    }
+    .prose-custom pre code { background: none; border: none; padding: 0; color: var(--ink-primary); }
+    .prose-custom table { display: block; width: 100%; overflow-x: auto; border-collapse: collapse; margin-bottom: 1em; font-size: 0.875rem; }
+    .prose-custom th, .prose-custom td { border: 1px solid var(--border-hairline); padding: 8px 12px; text-align: left; }
+    .prose-custom th { background-color: var(--bg-elevated); font-weight: 600; }
+    .prose-custom blockquote { border-left: 3px solid var(--accent); padding: 0.5em 1em; background-color: var(--bg-elevated); border-radius: 0 8px 8px 0; color: var(--ink-secondary); margin-bottom: 1em; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen overflow-x-hidden antialiased selection:bg-[var(--accent-soft)] selection:text-[var(--accent)] flex flex-col">
+
+  <div id="sr-announcement" class="sr-only" aria-live="polite"></div>
+
+  <!-- Full-Viewport Drag & Drop Overlay (covers 100% of active tab) -->
+  <div id="global-drop-overlay" class="fixed inset-0 z-50 hidden pointer-events-none bg-[var(--bg-canvas)]/85 backdrop-blur-sm p-6 flex items-center justify-center">
+    <div class="w-full h-full border-2 border-dashed border-[var(--accent)] rounded-3xl bg-[var(--accent-soft)] flex flex-col items-center justify-center gap-3 text-center p-8">
+      <div class="w-16 h-16 rounded-2xl bg-[var(--bg-panel)] border border-[var(--accent)] flex items-center justify-center text-[var(--accent)] card-elevated">
+        <i data-lucide="upload-cloud" class="w-8 h-8"></i>
+      </div>
+      <h2 id="global-drop-title" class="font-serif text-3xl font-bold text-[var(--ink-primary)]">Drop files anywhere to upload</h2>
+      <p id="global-drop-sub" class="text-sm text-[var(--ink-secondary)]">Files will be added directly to the active workspace</p>
+    </div>
+  </div>
+
+  <!-- Unified Header with #5 Expanding Label Tab Bar -->
+  <header class="sticky top-0 z-30 border-b border-[var(--border-hairline)] bg-[var(--bg-panel)]/95 backdrop-blur-sm">
+    <div class="max-w-[1440px] mx-auto px-4 sm:px-6 min-h-[60px] py-2 flex flex-wrap items-center justify-between gap-3">
+
+      <!-- Brand -->
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-[var(--accent-soft)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--accent)] flex-shrink-0">
+          <i data-lucide="coffee" class="w-4 h-4"></i>
+        </div>
+        <div>
+          <span class="font-serif text-xl font-bold tracking-tight text-[var(--ink-primary)] leading-none block">
+            Folio<span class="text-[var(--accent)]">-Local</span>
+          </span>
+          <span id="engine-status-text" class="text-[11px] font-mono text-[var(--ink-muted)]">Checking local server...</span>
+        </div>
+      </div>
+
+      <!-- #5 Expanding Label Tab Bar -->
+      <nav aria-label="Workspace mode" role="tablist" class="t-expanding-bar order-3 sm:order-2 mx-auto sm:mx-0">
+        <button id="nav-tab-convert" type="button" role="tab" aria-selected="true" data-view="convert" class="t-expanding-tab">
+          <i data-lucide="file-code-2" class="w-4 h-4 shrink-0" aria-hidden="true"></i>
+          <span class="t-expanding-label-wrap"><span class="t-expanding-label">MarkItDown</span></span>
+        </button>
+
+        <button id="nav-tab-ocr" type="button" role="tab" aria-selected="false" data-view="ocr" class="t-expanding-tab">
+          <i data-lucide="scan-text" class="w-4 h-4 shrink-0" aria-hidden="true"></i>
+          <span class="t-expanding-label-wrap"><span class="t-expanding-label">Image OCR</span></span>
+        </button>
+
+        <button id="nav-tab-pdf" type="button" role="tab" aria-selected="false" data-view="pdf" class="t-expanding-tab">
+          <i data-lucide="layers" class="w-4 h-4 shrink-0" aria-hidden="true"></i>
+          <span class="t-expanding-label-wrap"><span class="t-expanding-label">PDF Tools</span></span>
+        </button>
+      </nav>
+
+      <!-- Utility Actions -->
+      <div class="flex items-center gap-2 order-2 sm:order-3">
+        <button id="theme-toggle-btn" type="button" class="inline-flex items-center justify-center min-h-[40px] min-w-[40px] rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] hover:border-[var(--accent)] text-[var(--ink-secondary)] hover:text-[var(--accent)] transition-colors" title="Switch Cafe / Espresso Theme" aria-label="Switch Theme">
+          <i id="theme-icon" data-lucide="moon" class="w-4 h-4"></i>
+        </button>
+
+        <button id="open-settings-btn" type="button" class="inline-flex items-center justify-center min-h-[40px] min-w-[40px] rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] hover:border-[var(--accent)] text-[var(--ink-secondary)] hover:text-[var(--accent)] transition-colors" title="Settings" aria-label="Open Settings">
+          <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+        </button>
+
+        <a href="https://github.com/Dioscuri222/Folio-Local" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center min-h-[40px] min-w-[40px] rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] hover:border-[var(--border-strong)] text-[var(--ink-secondary)] hover:text-[var(--ink-primary)] transition-colors" title="Folio-Local GitHub" aria-label="View on GitHub">
+          <i data-lucide="github" class="w-4 h-4"></i>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       VIEW 1: MARKITDOWN CONVERTER (Unlimited Batch + URL)
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <main id="view-convert" class="t-view-enter flex-grow w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-6 sm:py-8 flex flex-col justify-center items-center cafe-aura">
+
+    <section id="upload-section" aria-labelledby="upload-heading" class="w-full max-w-2xl space-y-3">
+      <h2 id="upload-heading" class="sr-only">Document Upload Area</h2>
+
+      <div id="drop-zone" role="button" tabindex="0" aria-label="Drop files anywhere or press Enter to browse" class="card-elevated border-2 border-dashed border-[var(--border-strong)] hover:border-[var(--accent)] rounded-2xl bg-[var(--bg-panel)] p-8 sm:p-11 text-center transition-colors duration-200 cursor-pointer">
+        <input type="file" id="file-input" multiple class="hidden" accept=".pdf,.docx,.pptx,.xlsx,.xls,.csv,.html,.htm,.json,.xml,.txt,.md,.markdown,.epub,.zip,.png,.jpg,.jpeg,.webp,.gif,.mp3,.wav,.m4a,.svg,.js,.ts,.py,.css" />
+
+        <div id="drop-zone-hero" class="max-w-lg mx-auto space-y-5 pointer-events-none">
+          <div class="mx-auto w-14 h-14 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--accent)]">
+            <i data-lucide="upload-cloud" class="w-7 h-7"></i>
+          </div>
+          <div class="space-y-2">
+            <h1 class="font-serif text-[clamp(1.85rem,3.6vw,2.5rem)] leading-tight font-bold text-[var(--ink-primary)]">
+              Drop files anywhere to convert to <span class="text-[var(--accent)]">Markdown</span>
+            </h1>
+            <p class="text-sm text-[var(--ink-secondary)] leading-relaxed">
+              Drag and drop anywhere on this tab or <span class="text-[var(--accent)] font-semibold underline underline-offset-4">browse files</span>. Unlimited batch files with automatic RapidOCR for scanned PDFs.
+            </p>
+          </div>
+          <div class="flex flex-wrap justify-center gap-1.5">
+            <span class="px-2.5 py-1 text-xs rounded-lg bg-[var(--bg-elevated)] text-[var(--ink-secondary)] border border-[var(--border-hairline)]">PDF + RapidOCR</span>
+            <span class="px-2.5 py-1 text-xs rounded-lg bg-[var(--bg-elevated)] text-[var(--ink-secondary)] border border-[var(--border-hairline)]">DOCX / PPTX</span>
+            <span class="px-2.5 py-1 text-xs rounded-lg bg-[var(--bg-elevated)] text-[var(--ink-secondary)] border border-[var(--border-hairline)]">XLSX / CSV</span>
+            <span class="px-2.5 py-1 text-xs rounded-lg bg-[var(--bg-elevated)] text-[var(--ink-secondary)] border border-[var(--border-hairline)]">HTML / URL</span>
+            <span class="px-2.5 py-1 text-xs rounded-lg bg-[var(--bg-elevated)] text-[var(--ink-secondary)] border border-[var(--border-hairline)]">EPUB / Audio / Code</span>
+          </div>
+        </div>
+
+        <div id="drop-zone-compact" class="hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pointer-events-none">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-strong)] flex items-center justify-center text-[var(--accent)]">
+              <i data-lucide="plus" class="w-5 h-5"></i>
+            </div>
+            <div class="text-left">
+              <p class="text-sm font-semibold text-[var(--ink-primary)]">Add more files to queue</p>
+              <p class="text-xs text-[var(--ink-muted)]">Drop anywhere on this tab or click to browse</p>
+            </div>
+          </div>
+          <span class="px-4 py-2 text-xs font-semibold rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-strong)] text-[var(--ink-primary)]">Browse Files</span>
+        </div>
+      </div>
+
+      <form id="url-convert-form" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-2 rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)]">
+        <div class="relative flex-grow min-w-0">
+          <i data-lucide="link" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--ink-muted)] pointer-events-none"></i>
+          <input type="url" id="url-input" placeholder="Paste web page or YouTube URL..." class="w-full min-h-[42px] md:min-h-[38px] pl-9 pr-3 text-sm rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] placeholder-[var(--ink-muted)]" />
+        </div>
+        <button id="convert-url-btn" type="submit" class="inline-flex items-center justify-center gap-2 min-h-[42px] md:min-h-[38px] px-5 text-xs font-semibold rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-fg)] transition-colors flex-shrink-0">
+          <i data-lucide="globe" class="w-4 h-4"></i>
+          <span>Extract URL</span>
+        </button>
+      </form>
+    </section>
+
+    <section id="batch-control-bar" class="hidden w-full bg-[var(--bg-panel)] border border-[var(--border-hairline)] rounded-2xl p-4 space-y-3">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div class="flex items-center gap-3 min-w-0">
+          <div id="batch-spinner" class="animate-spin text-[var(--accent)] hidden flex-shrink-0"><i data-lucide="loader-2" class="w-4 h-4"></i></div>
+          <div class="min-w-0">
+            <h4 id="batch-summary-text" class="text-sm font-semibold text-[var(--ink-primary)] truncate">Converted 0 of 0 items</h4>
+            <p id="batch-size-text" class="text-xs text-[var(--ink-muted)] font-mono">Payload: 0 B</p>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="relative flex-grow sm:flex-grow-0 min-w-[170px]">
+            <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--ink-muted)] pointer-events-none"></i>
+            <input type="text" id="queue-search" placeholder="Filter queue..." class="w-full min-h-[40px] pl-9 pr-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] placeholder-[var(--ink-muted)]" />
+          </div>
+          <select id="status-filter" aria-label="Filter by status" class="min-h-[40px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+            <option value="all">All Status</option>
+            <option value="done">Completed</option>
+            <option value="converting">Processing</option>
+            <option value="error">Errors</option>
+          </select>
+          <button id="download-zip-btn" type="button" class="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-semibold rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-fg)]">
+            <i data-lucide="archive" class="w-4 h-4"></i><span>Export .ZIP</span>
+          </button>
+          <button id="clear-queue-btn" type="button" class="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-3 text-xs font-medium rounded-xl text-[var(--ink-secondary)] hover:text-[var(--crimson)] bg-[var(--bg-elevated)] border border-[var(--border-hairline)]">
+            <i data-lucide="trash-2" class="w-4 h-4"></i><span>Clear</span>
+          </button>
+        </div>
+      </div>
+      <div class="w-full bg-[var(--bg-elevated)] h-2 rounded-full overflow-hidden">
+        <div id="batch-progress-bar" class="bg-[var(--accent)] h-full w-0 transition-all duration-300 rounded-full"></div>
+      </div>
+    </section>
+
+    <div id="workspace-grid" class="hidden w-full grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+      <section aria-label="Conversion Queue" class="lg:col-span-4 space-y-2.5 min-w-0">
+        <div class="flex items-center justify-between px-1 border-b border-[var(--border-hairline)] pb-2">
+          <h3 class="text-xs font-semibold text-[var(--ink-secondary)] flex items-center gap-2">
+            <span>Active Queue</span>
+            <span id="queue-count-badge" class="px-2 py-0.5 rounded-md bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--accent)] font-mono">0</span>
+          </h3>
+        </div>
+        <div id="file-queue-container" class="space-y-2 max-h-[650px] overflow-y-auto pr-1"></div>
+      </section>
+
+      <section aria-label="Markdown Inspector" class="lg:col-span-8 min-w-0 bg-[var(--bg-panel)] border border-[var(--border-hairline)] rounded-2xl card-elevated overflow-hidden flex flex-col min-h-[560px] lg:sticky lg:top-20">
+        <div class="bg-[var(--bg-elevated)]/80 border-b border-[var(--border-hairline)] px-4 py-3 flex flex-wrap items-center justify-between gap-2.5">
+          <div class="flex items-center gap-2.5 min-w-0 max-w-full sm:max-w-xs">
+            <div class="p-2 rounded-xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] text-[var(--accent)] flex-shrink-0">
+              <i data-lucide="file-text" class="w-4 h-4"></i>
+            </div>
+            <div class="min-w-0">
+              <h4 id="inspector-file-name" class="text-xs sm:text-sm font-semibold text-[var(--ink-primary)] truncate">Select a file</h4>
+              <p id="inspector-file-sub" class="text-xs text-[var(--ink-muted)] truncate">Awaiting selection</p>
+            </div>
+          </div>
+
+          <div class="flex items-center bg-[var(--bg-panel)] p-1 rounded-xl border border-[var(--border-hairline)]" role="tablist">
+            <button id="tab-raw-btn" type="button" role="tab" aria-selected="true" class="min-h-[32px] px-3 text-xs font-semibold rounded-lg bg-[var(--bg-elevated)] text-[var(--accent)]">Raw .md</button>
+            <button id="tab-preview-btn" type="button" role="tab" aria-selected="false" class="min-h-[32px] px-3 text-xs font-medium rounded-lg text-[var(--ink-muted)] hover:text-[var(--ink-primary)]">Preview</button>
+            <button id="tab-split-btn" type="button" role="tab" aria-selected="false" class="hidden md:inline-flex items-center min-h-[32px] px-3 text-xs font-medium rounded-lg text-[var(--ink-muted)] hover:text-[var(--ink-primary)]">Split</button>
+          </div>
+
+          <div class="flex items-center gap-1.5">
+            <button id="toggle-wrap-btn" type="button" class="inline-flex items-center justify-center min-h-[36px] min-w-[36px] rounded-xl text-[var(--ink-secondary)] hover:text-[var(--ink-primary)] bg-[var(--bg-panel)] border border-[var(--border-hairline)]" title="Toggle line wrap"><i data-lucide="wrap-text" class="w-4 h-4"></i></button>
+            <button id="copy-md-btn" type="button" class="inline-flex items-center justify-center gap-1.5 min-h-[36px] px-3 text-xs font-medium rounded-xl text-[var(--ink-primary)] bg-[var(--bg-panel)] border border-[var(--border-hairline)]"><i data-lucide="copy" class="w-4 h-4"></i><span class="hidden sm:inline">Copy</span></button>
+            <button id="download-single-btn" type="button" class="inline-flex items-center justify-center gap-1.5 min-h-[36px] px-3.5 text-xs font-semibold rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-fg)]"><i data-lucide="download" class="w-4 h-4"></i><span class="hidden sm:inline">.md</span></button>
+          </div>
+        </div>
+
+        <div class="flex-grow p-3 sm:p-4 bg-[var(--bg-canvas)]/50 flex flex-col min-h-[450px] min-w-0">
+          <div id="inspector-empty-state" class="my-auto text-center py-14 space-y-2">
+            <p class="text-sm text-[var(--ink-secondary)]">Select an item from the queue to inspect or export its Markdown.</p>
+          </div>
+          <div id="inspector-views" class="hidden flex-grow grid grid-cols-1 gap-3 min-h-[450px] min-w-0">
+            <div id="inspector-raw-view" class="flex flex-col h-full min-w-0">
+              <textarea id="markdown-textarea" readonly class="w-full h-full min-h-[450px] max-h-[550px] p-4 rounded-xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] font-mono text-xs text-[var(--ink-primary)] resize-none leading-relaxed" spellcheck="false"></textarea>
+            </div>
+            <div id="inspector-preview-view" class="hidden p-5 rounded-xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] overflow-y-auto min-h-[450px] max-h-[550px] min-w-0 prose-custom"></div>
+          </div>
+        </div>
+
+        <div class="bg-[var(--bg-elevated)]/80 border-t border-[var(--border-hairline)] px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--ink-muted)] font-mono">
+          <span id="inspector-char-count">0 chars / 0 words / 0 lines</span>
+          <span id="inspector-status-text">Standby</span>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       VIEW 2: LOCAL IMAGE & PDF OCR (RapidOCR — Baidu PaddleOCR ONNX)
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <section id="view-ocr" class="hidden t-view-enter flex-grow w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+    <div class="flex flex-wrap items-end justify-between gap-4 border-b border-[var(--border-hairline)] pb-4">
+      <div>
+        <h2 class="font-serif text-2xl sm:text-3xl font-bold text-[var(--ink-primary)]">Local Image &amp; Photo OCR</h2>
+        <p class="text-sm text-[var(--ink-secondary)] mt-1">
+          Drop any photo or scanned PDF anywhere on this tab to extract clean text locally using RapidOCR with automatic rotation detection.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <label for="ocr-rotate-select" class="text-xs text-[var(--ink-muted)]">Orientation:</label>
+        <select id="ocr-rotate-select" class="min-h-[38px] px-3 text-xs rounded-xl bg-[var(--bg-panel)] border border-[var(--border-strong)] text-[var(--ink-primary)]">
+          <option value="auto">Auto-Detect (0/90/180/270°)</option>
+          <option value="0">0° (As-is)</option>
+          <option value="90">Rotate 90° CW</option>
+          <option value="180">Rotate 180°</option>
+          <option value="270">Rotate 270° CW</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div class="lg:col-span-5 space-y-4">
+        <div id="ocr-drop-zone" role="button" tabindex="0" class="card-elevated border-2 border-dashed border-[var(--border-strong)] hover:border-[var(--accent)] rounded-2xl bg-[var(--bg-panel)] p-8 text-center cursor-pointer transition-colors">
+          <input type="file" id="ocr-file-input" class="hidden" accept=".jpg,.jpeg,.png,.webp,.bmp,.pdf" />
+          <div class="space-y-3 pointer-events-none">
+            <div class="mx-auto w-12 h-12 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--accent)]">
+              <i data-lucide="scan-text" class="w-6 h-6"></i>
+            </div>
+            <p class="text-sm font-semibold text-[var(--ink-primary)]">Drop photo anywhere on this tab, or click here</p>
+            <p class="text-xs text-[var(--ink-muted)]">Supports rotated laptop/phone photos (.jpg, .jpeg, .png, .pdf)</p>
+          </div>
+        </div>
+
+        <div id="ocr-preview-card" class="hidden rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] p-3.5 space-y-2.5">
+          <div class="flex items-center justify-between text-xs text-[var(--ink-muted)]">
+            <span id="ocr-file-label" class="truncate font-mono text-[var(--ink-primary)]">image.jpg</span>
+            <button id="ocr-rerun-btn" type="button" class="px-3 py-1 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-hairline)] hover:border-[var(--accent)] text-[var(--accent)] font-medium">Re-run OCR</button>
+          </div>
+          <img id="ocr-preview-img" alt="Uploaded OCR preview" class="w-full max-h-[340px] object-contain rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-hairline)]" />
+        </div>
+      </div>
+
+      <div class="lg:col-span-7 rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] card-elevated overflow-hidden flex flex-col min-h-[480px]">
+        <div class="bg-[var(--bg-elevated)]/80 border-b border-[var(--border-hairline)] px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2 text-xs">
+            <span class="font-semibold text-[var(--ink-primary)]">Extracted Plain Text</span>
+            <span id="ocr-meta-badge" class="px-2 py-0.5 rounded-md bg-[var(--bg-panel)] border border-[var(--border-hairline)] text-[var(--accent)] font-mono">Ready</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="ocr-copy-btn" type="button" class="inline-flex items-center gap-1.5 min-h-[36px] px-3 text-xs font-medium rounded-xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] hover:border-[var(--accent)] text-[var(--ink-primary)]">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i><span>Copy Text</span>
+            </button>
+            <button id="ocr-download-txt-btn" type="button" class="inline-flex items-center gap-1.5 min-h-[36px] px-3.5 text-xs font-semibold rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-fg)]">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i><span>.txt</span>
+            </button>
+          </div>
+        </div>
+        <div class="flex-grow p-4 bg-[var(--bg-canvas)]/50">
+          <textarea id="ocr-output-textarea" placeholder="Extracted text will appear here. You can edit it before copying..." class="w-full h-full min-h-[390px] p-4 rounded-xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] font-mono text-xs text-[var(--ink-primary)] leading-relaxed resize-y"></textarea>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════
+       VIEW 3: LOCAL PDF TOOLKIT (iLovePDF Lokal)
+  ═══════════════════════════════════════════════════════════════════════════ -->
+  <section id="view-pdf" class="hidden t-view-enter flex-grow w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+    <div class="border-b border-[var(--border-hairline)] pb-4">
+      <h2 class="font-serif text-2xl sm:text-3xl font-bold text-[var(--ink-primary)]">Local PDF Toolkit</h2>
+      <p class="text-sm text-[var(--ink-secondary)] mt-1">
+        Merge, split, rotate, compress, and convert PDFs locally. Drag and drop files anywhere on this tab.
+      </p>
+    </div>
+
+    <div id="pdf-tool-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <button type="button" data-pdf-tool="merge" class="pdf-tool-card p-3.5 text-left rounded-2xl border border-[var(--accent)] bg-[var(--accent-soft)] transition-colors">
+        <i data-lucide="git-merge" class="w-5 h-5 text-[var(--accent)] mb-2"></i>
+        <div class="text-xs font-semibold text-[var(--ink-primary)]">Merge PDF</div>
+        <div class="text-[11px] text-[var(--ink-muted)] mt-0.5">Combine multiple PDFs</div>
+      </button>
+
+      <button type="button" data-pdf-tool="split" class="pdf-tool-card p-3.5 text-left rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-panel)] hover:border-[var(--border-strong)] transition-colors">
+        <i data-lucide="scissors" class="w-5 h-5 text-[var(--gold)] mb-2"></i>
+        <div class="text-xs font-semibold text-[var(--ink-primary)]">Split PDF</div>
+        <div class="text-[11px] text-[var(--ink-muted)] mt-0.5">Extract or burst pages</div>
+      </button>
+
+      <button type="button" data-pdf-tool="rotate" class="pdf-tool-card p-3.5 text-left rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-panel)] hover:border-[var(--border-strong)] transition-colors">
+        <i data-lucide="rotate-cw" class="w-5 h-5 text-[var(--accent)] mb-2"></i>
+        <div class="text-xs font-semibold text-[var(--ink-primary)]">Rotate PDF</div>
+        <div class="text-[11px] text-[var(--ink-muted)] mt-0.5">Turn 90 / 180 / 270°</div>
+      </button>
+
+      <button type="button" data-pdf-tool="compress" class="pdf-tool-card p-3.5 text-left rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-panel)] hover:border-[var(--border-strong)] transition-colors">
+        <i data-lucide="minimize-2" class="w-5 h-5 text-[var(--gold)] mb-2"></i>
+        <div class="text-xs font-semibold text-[var(--ink-primary)]">Compress PDF</div>
+        <div class="text-[11px] text-[var(--ink-muted)] mt-0.5">Shrink stream size</div>
+      </button>
+
+      <button type="button" data-pdf-tool="to-images" class="pdf-tool-card p-3.5 text-left rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-panel)] hover:border-[var(--border-strong)] transition-colors">
+        <i data-lucide="images" class="w-5 h-5 text-[var(--accent)] mb-2"></i>
+        <div class="text-xs font-semibold text-[var(--ink-primary)]">PDF to JPG/PNG</div>
+        <div class="text-[11px] text-[var(--ink-muted)] mt-0.5">Render pages to ZIP</div>
+      </button>
+
+      <button type="button" data-pdf-tool="from-images" class="pdf-tool-card p-3.5 text-left rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-panel)] hover:border-[var(--border-strong)] transition-colors">
+        <i data-lucide="file-plus-2" class="w-5 h-5 text-[var(--gold)] mb-2"></i>
+        <div class="text-xs font-semibold text-[var(--ink-primary)]">JPG/PNG to PDF</div>
+        <div class="text-[11px] text-[var(--ink-muted)] mt-0.5">Pack images into PDF</div>
+      </button>
+    </div>
+
+    <div class="card-elevated rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] p-5 sm:p-6 space-y-5">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-hairline)] pb-3">
+        <div>
+          <h3 id="pdf-active-title" class="font-serif text-xl font-bold text-[var(--ink-primary)]">Merge PDF</h3>
+          <p id="pdf-active-desc" class="text-xs text-[var(--ink-muted)]">Select 2 or more PDF files to combine into a single PDF document.</p>
+        </div>
+        <button id="pdf-clear-files-btn" type="button" class="text-xs text-[var(--ink-muted)] hover:text-[var(--crimson)]">Clear selection</button>
+      </div>
+
+      <div id="pdf-drop-zone" role="button" tabindex="0" class="border-2 border-dashed border-[var(--border-strong)] hover:border-[var(--accent)] rounded-2xl bg-[var(--bg-canvas)]/50 p-7 text-center cursor-pointer transition-colors">
+        <input type="file" id="pdf-tool-input" multiple class="hidden" accept=".pdf" />
+        <p class="text-sm font-medium text-[var(--ink-primary)]">Drop files anywhere on this tab, or click to select</p>
+        <p id="pdf-input-hint" class="text-xs text-[var(--ink-muted)] mt-1">Accepts .pdf files</p>
+      </div>
+
+      <div id="pdf-file-list" class="hidden space-y-1.5 max-h-52 overflow-y-auto"></div>
+
+      <div id="pdf-options-split" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label for="pdf-split-pages" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Page ranges (leave empty for all)</label>
+          <input id="pdf-split-pages" type="text" placeholder="e.g. 1-3, 5, 8-10" class="w-full min-h-[40px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] font-mono" />
+        </div>
+        <div>
+          <label for="pdf-split-mode" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Output format</label>
+          <select id="pdf-split-mode" class="w-full min-h-[40px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+            <option value="extract">Single PDF with extracted pages</option>
+            <option value="burst">ZIP archive (1 PDF per page)</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="pdf-options-rotate" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label for="pdf-rotate-angle" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Rotation angle (clockwise)</label>
+          <select id="pdf-rotate-angle" class="w-full min-h-[40px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+            <option value="90">90° Clockwise</option>
+            <option value="180">180° Flip</option>
+            <option value="270">270° (90° Counter-clockwise)</option>
+          </select>
+        </div>
+        <div>
+          <label for="pdf-rotate-pages" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Specific pages (optional)</label>
+          <input id="pdf-rotate-pages" type="text" placeholder="All pages if empty (e.g. 1, 3-5)" class="w-full min-h-[40px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] font-mono" />
+        </div>
+      </div>
+
+      <div id="pdf-options-to-images" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label for="pdf-img-format" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Image format</label>
+          <select id="pdf-img-format" class="w-full min-h-[40px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+            <option value="jpeg">JPG (Smaller size)</option>
+            <option value="png">PNG (Lossless)</option>
+          </select>
+        </div>
+        <div>
+          <label for="pdf-img-dpi" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Resolution (DPI)</label>
+          <select id="pdf-img-dpi" class="w-full min-h-[40px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+            <option value="150">150 DPI (Standard)</option>
+            <option value="200">200 DPI (Sharp)</option>
+            <option value="300">300 DPI (Print Quality)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[var(--border-hairline)]">
+        <span id="pdf-result-info" class="text-xs font-mono text-[var(--ink-muted)]">Ready</span>
+        <button id="pdf-run-btn" type="button" class="inline-flex items-center justify-center gap-2 min-h-[42px] px-6 text-xs font-semibold rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-fg)] disabled:opacity-45">
+          <i data-lucide="play" class="w-4 h-4"></i>
+          <span id="pdf-run-label">Run Merge PDF</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide-Over Settings Drawer -->
+  <div id="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title" class="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 hidden flex justify-end">
+    <div class="bg-[var(--bg-panel)] border-l border-[var(--border-strong)] w-full max-w-md h-full flex flex-col justify-between p-6 overflow-y-auto">
+      <div class="space-y-5">
+        <div class="flex items-center justify-between border-b border-[var(--border-hairline)] pb-3">
+          <div class="flex items-center gap-2.5">
+            <i data-lucide="sliders-horizontal" class="w-4 h-4 text-[var(--accent)]"></i>
+            <h3 id="settings-modal-title" class="font-serif text-xl font-bold text-[var(--ink-primary)]">Folio-Local Settings</h3>
+          </div>
+          <button id="close-settings-btn" type="button" class="inline-flex items-center justify-center min-h-[38px] min-w-[38px] rounded-xl text-[var(--ink-secondary)] hover:text-[var(--ink-primary)] bg-[var(--bg-elevated)] border border-[var(--border-hairline)]" aria-label="Close Settings">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div class="space-y-3.5 text-xs text-[var(--ink-secondary)]">
+          <div class="p-3.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] space-y-2.5">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <label for="opt-pdf-ocr" class="font-semibold text-[var(--ink-primary)] block">Auto OCR for Scanned PDFs</label>
+                <p class="text-xs text-[var(--ink-muted)] mt-0.5">Uses RapidOCR on server (or Tesseract.js offline fallback)</p>
+              </div>
+              <input type="checkbox" id="opt-pdf-ocr" checked class="w-5 h-5 accent-[var(--accent)] cursor-pointer flex-shrink-0" />
+            </div>
+            <div class="space-y-1 pt-2 border-t border-[var(--border-hairline)]">
+              <label for="opt-ocr-lang" class="text-xs font-medium text-[var(--ink-secondary)] block">Browser Fallback OCR Language</label>
+              <select id="opt-ocr-lang" class="w-full min-h-[38px] px-2.5 rounded-xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+                <option value="eng+ind">English + Indonesian (eng+ind)</option>
+                <option value="eng">English only (eng)</option>
+                <option value="ind">Indonesian only (ind)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)]">
+            <div>
+              <label for="opt-frontmatter" class="font-semibold text-[var(--ink-primary)] block">Include YAML Frontmatter</label>
+              <p class="text-xs text-[var(--ink-muted)] mt-0.5">Prepend title, timestamp, and file size metadata</p>
+            </div>
+            <input type="checkbox" id="opt-frontmatter" checked class="w-5 h-5 accent-[var(--accent)] cursor-pointer flex-shrink-0" />
+          </div>
+
+          <div class="space-y-1.5">
+            <label for="opt-heading-style" class="font-semibold text-[var(--ink-primary)] block">Heading Style</label>
+            <select id="opt-heading-style" class="w-full min-h-[38px] px-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+              <option value="atx">ATX Style (# Heading)</option>
+              <option value="setext">Setext Style (Underline ===)</option>
+            </select>
+          </div>
+
+          <div class="space-y-1.5">
+            <label for="opt-code-fence" class="font-semibold text-[var(--ink-primary)] block">Code Block Fence</label>
+            <select id="opt-code-fence" class="w-full min-h-[38px] px-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+              <option value="```">Backticks (```)</option>
+              <option value="~~~">Tildes (~~~)</option>
+            </select>
+          </div>
+
+          <div class="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)]">
+            <div>
+              <label for="opt-gfm-tables" class="font-semibold text-[var(--ink-primary)] block">GFM Strict Tables</label>
+              <p class="text-xs text-[var(--ink-muted)] mt-0.5">Format HTML and Excel tables with GitHub-flavored pipes</p>
+            </div>
+            <input type="checkbox" id="opt-gfm-tables" checked class="w-5 h-5 accent-[var(--accent)] cursor-pointer flex-shrink-0" />
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] space-y-2">
+            <div>
+              <span class="font-semibold text-[var(--ink-primary)] block">Vision LLM (Optional)</span>
+              <p class="text-xs text-[var(--ink-muted)] mt-0.5">Describe images/charts via OpenAI, Ollama, or LM Studio</p>
+            </div>
+            <input type="text" id="opt-llm-base-url" placeholder="Base URL (e.g. http://localhost:11434/v1)" class="w-full min-h-[38px] px-3 rounded-xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] text-[var(--ink-primary)] placeholder-[var(--ink-muted)]" />
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <input type="text" id="opt-llm-model" placeholder="Model (e.g. gpt-4o-mini)" class="w-full min-h-[38px] px-3 rounded-xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] text-[var(--ink-primary)] placeholder-[var(--ink-muted)]" />
+              <input type="password" id="opt-llm-api-key" placeholder="API Key (optional)" class="w-full min-h-[38px] px-3 rounded-xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] text-[var(--ink-primary)] placeholder-[var(--ink-muted)]" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-5 mt-5 border-t border-[var(--border-hairline)]">
+        <button id="cancel-settings-btn" type="button" class="min-h-[38px] px-4 text-xs font-medium rounded-xl bg-[var(--bg-elevated)] text-[var(--ink-secondary)] hover:text-[var(--ink-primary)] border border-[var(--border-hairline)]">Cancel</button>
+        <button id="save-settings-btn" type="button" class="min-h-[38px] px-5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-fg)] font-semibold text-xs">Apply &amp; Re-run</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <script>
+    if (window.pdfjsLib) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
+    const settings = {
+      enableFrontmatter: true,
+      headingStyle: 'atx',
+      codeFence: '```',
+      gfmTables: true,
+      enablePdfOcr: true,
+      ocrLang: 'eng+ind',
+      llmBaseUrl: '',
+      llmModel: '',
+      llmApiKey: ''
+    };
+
+    let backendAvailable = false;
+    let activeMainView = 'convert'; // 'convert' | 'ocr' | 'pdf'
+    const API_BASE = window.location.protocol.startsWith('http') ? '' : 'http://127.0.0.1:8765';
+
+    async function detectBackend() {
+      const txt = document.getElementById('engine-status-text');
+      try {
+        const res = await fetch(`${API_BASE}/api/health`, { signal: AbortSignal.timeout(1500) });
+        if (res.ok) {
+          backendAvailable = true;
+          if (txt) txt.textContent = 'Local Server Online • RapidOCR + PDF Tools';
+          return;
+        }
+      } catch (_) {}
+      backendAvailable = false;
+      if (txt) txt.textContent = 'Browser Fallback Only (Start_Markitdown.bat)';
+    }
+
+    // ── #5 Expanding Label Tab Switcher ──────────────────────────────────────
+    const views = {
+      convert: document.getElementById('view-convert'),
+      ocr: document.getElementById('view-ocr'),
+      pdf: document.getElementById('view-pdf')
+    };
+
+    function switchMainView(viewName) {
+      activeMainView = viewName;
+      document.querySelectorAll('.t-expanding-tab').forEach(btn => {
+        const active = btn.getAttribute('data-view') === viewName;
+        btn.setAttribute('aria-selected', String(active));
+      });
+      Object.entries(views).forEach(([key, el]) => {
+        if (!el) return;
+        const show = key === viewName;
+        el.classList.toggle('hidden', !show);
+        if (show) {
+          el.classList.remove('t-view-enter');
+          void el.offsetWidth;
+          el.classList.add('t-view-enter');
+        }
+      });
+      refreshIcons();
+    }
+
+    // ── Shared Helpers ───────────────────────────────────────────────────────
+    function refreshIcons() { if (window.lucide) lucide.createIcons(); }
+    function escapeHtml(str) { return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+    function formatBytes(bytes) {
+      if (!bytes || bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+    function copyToClipboard(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-999999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+    }
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const borderColor = type === 'success' ? 'border-l-[var(--accent)]' : type === 'error' ? 'border-l-[var(--crimson)]' : 'border-l-[var(--gold)]';
+      const iconColor = type === 'success' ? 'text-[var(--accent)]' : type === 'error' ? 'text-[var(--crimson)]' : 'text-[var(--gold)]';
+      const iconName = type === 'success' ? 'check-circle-2' : type === 'error' ? 'alert-triangle' : type === 'warning' ? 'alert-circle' : 'info';
+      toast.className = `pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl bg-[var(--bg-panel)] border border-[var(--border-strong)] border-l-4 ${borderColor} text-xs font-medium card-elevated transition-all duration-200 translate-y-2 opacity-0`;
+      toast.innerHTML = `<i data-lucide="${iconName}" class="w-4 h-4 shrink-0 ${iconColor}"></i><span class="text-[var(--ink-primary)]">${escapeHtml(message)}</span>`;
+      container.appendChild(toast);
+      refreshIcons();
+      requestAnimationFrame(() => toast.classList.remove('translate-y-2', 'opacity-0'));
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 220);
+      }, 3200);
+    }
+
+    // Theme Management (Default: Light Cafe Latte)
+    function initTheme() {
+      const saved = localStorage.getItem('folio-cafe-theme') || 'light';
+      applyTheme(saved);
+    }
+    function applyTheme(theme) {
+      const html = document.documentElement;
+      const icon = document.getElementById('theme-icon');
+      if (theme === 'dark') {
+        html.classList.add('dark');
+        icon.setAttribute('data-lucide', 'sun');
+      } else {
+        html.classList.remove('dark');
+        icon.setAttribute('data-lucide', 'moon');
+      }
+      localStorage.setItem('folio-cafe-theme', theme);
+      refreshIcons();
+    }
+
+    // ── VIEW 1: MARKITDOWN CONVERTER ─────────────────────────────────────────
+    let fileQueue = [];
+    let activeFileId = null;
+    let activeTab = 'raw';
+    let lineWrap = true;
+    let isProcessing = false;
+
+    const mainWorkspace = document.getElementById('view-convert');
+    const uploadSection = document.getElementById('upload-section');
+    const dropZone = document.getElementById('drop-zone');
+    const dropZoneHero = document.getElementById('drop-zone-hero');
+    const dropZoneCompact = document.getElementById('drop-zone-compact');
+    const fileInput = document.getElementById('file-input');
+    const urlConvertForm = document.getElementById('url-convert-form');
+    const urlInput = document.getElementById('url-input');
+    const batchControlBar = document.getElementById('batch-control-bar');
+    const workspaceGrid = document.getElementById('workspace-grid');
+    const fileQueueContainer = document.getElementById('file-queue-container');
+    const batchSummaryText = document.getElementById('batch-summary-text');
+    const batchSizeText = document.getElementById('batch-size-text');
+    const batchProgressBar = document.getElementById('batch-progress-bar');
+    const batchSpinner = document.getElementById('batch-spinner');
+    const queueCountBadge = document.getElementById('queue-count-badge');
+    const queueSearch = document.getElementById('queue-search');
+    const statusFilter = document.getElementById('status-filter');
+    const inspectorFileName = document.getElementById('inspector-file-name');
+    const inspectorFileSub = document.getElementById('inspector-file-sub');
+    const inspectorEmptyState = document.getElementById('inspector-empty-state');
+    const inspectorViews = document.getElementById('inspector-views');
+    const inspectorRawView = document.getElementById('inspector-raw-view');
+    const inspectorPreviewView = document.getElementById('inspector-preview-view');
+    const markdownTextarea = document.getElementById('markdown-textarea');
+    const inspectorCharCount = document.getElementById('inspector-char-count');
+    const inspectorStatusText = document.getElementById('inspector-status-text');
+    const tabRawBtn = document.getElementById('tab-raw-btn');
+    const tabPreviewBtn = document.getElementById('tab-preview-btn');
+    const tabSplitBtn = document.getElementById('tab-split-btn');
+
+    function createTurndownService() {
+      const td = new TurndownService({ headingStyle: settings.headingStyle, codeBlockStyle: 'fenced', emDelimiter: '*' });
+      if (settings.gfmTables && window.turndownPluginGfm) td.use(turndownPluginGfm.gfm);
+      return td;
+    }
+    function generateFrontmatter(file, methodNote = '') {
+      if (!settings.enableFrontmatter) return '';
+      const now = new Date().toISOString();
+      let fm = `---\ntitle: "${file.name}"\nconverted_at: "${now}"\noriginal_size: ${file.size}\noriginal_type: "${file.type || 'unknown'}"`;
+      if (methodNote) fm += `\nextraction_method: "${methodNote}"`;
+      return fm + `\n---\n\n`;
+    }
+
+    async function processPdfClient(file) {
+      const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+      let markdown = `# ${file.name.replace(/\.[^/.]+$/, "")}\n\n`;
+      let ocrWorker = null;
+      let ocrUsed = false;
+      try {
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const tc = await page.getTextContent();
+          let pageText = tc.items.map(it => it.str).join(' ').trim();
+          if (!pageText && settings.enablePdfOcr && window.Tesseract) {
+            ocrUsed = true;
+            if (!ocrWorker) ocrWorker = await Tesseract.createWorker(settings.ocrLang);
+            const vp = page.getViewport({ scale: 2.0 });
+            const cv = document.createElement('canvas');
+            cv.width = vp.width; cv.height = vp.height;
+            await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+            const { data: { text } } = await ocrWorker.recognize(cv);
+            pageText = text.trim();
+          }
+          markdown += (pdf.numPages > 1 ? `## Page ${i}\n\n` : '') + (pageText || '> [No text detected]') + '\n\n';
+        }
+      } finally { if (ocrWorker) await ocrWorker.terminate(); }
+      return { markdown, method: ocrUsed ? 'PDF OCR (Browser)' : 'PDF Text' };
+    }
+
+    async function convertFileToMarkdown(item) {
+      if (backendAvailable) {
+        const fd = new FormData();
+        if (item.url) fd.append('url', item.url);
+        else fd.append('file', item.file);
+        fd.append('enable_frontmatter', String(settings.enableFrontmatter));
+        fd.append('enable_ocr', String(settings.enablePdfOcr));
+        if (settings.llmBaseUrl) fd.append('llm_base_url', settings.llmBaseUrl);
+        if (settings.llmModel) fd.append('llm_model', settings.llmModel);
+        if (settings.llmApiKey) fd.append('llm_api_key', settings.llmApiKey);
+
+        const endpoint = item.url ? `${API_BASE}/api/convert-url` : `${API_BASE}/api/convert`;
+        const res = await fetch(endpoint, { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || `Server error (${res.status})`);
+        item.method = data.method || 'Microsoft MarkItDown';
+        return data.markdown;
+      }
+
+      if (item.url) throw new Error('Run Start_Markitdown.bat to extract URLs.');
+      const file = item.file;
+      const ext = file.name.split('.').pop().toLowerCase();
+      let bodyMd = '';
+      let method = ext.toUpperCase();
+      if (ext === 'pdf') {
+        const r = await processPdfClient(file);
+        bodyMd = r.markdown; method = r.method;
+      } else if (ext === 'docx') {
+        const res = await mammoth.convertToHtml({ arrayBuffer: await file.arrayBuffer() });
+        bodyMd = createTurndownService().turndown(res.value);
+      } else if (['xlsx', 'xls', 'csv'].includes(ext)) {
+        const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+        bodyMd = `# ${file.name}\n\n`;
+        wb.SheetNames.forEach(s => {
+          const arr = XLSX.utils.sheet_to_json(wb.Sheets[s], { header: 1 });
+          if (arr.length) {
+            const h = arr[0];
+            bodyMd += `## ${s}\n\n| ${h.join(' | ')} |\n| ${h.map(() => '---').join(' | ')} |\n`;
+            arr.slice(1).forEach(r => { if (r.length) bodyMd += `| ${h.map((_, i) => String(r[i] ?? '').replace(/\|/g, '\\|')).join(' | ')} |\n`; });
+            bodyMd += '\n';
+          }
+        });
+      } else if (['html', 'htm'].includes(ext)) {
+        bodyMd = createTurndownService().turndown(await file.text());
+      } else {
+        bodyMd = await file.text();
+      }
+      item.method = method;
+      return generateFrontmatter(file, method) + bodyMd;
+    }
+
+    function addFilesToQueue(files) {
+      if (!files || !files.length) return;
+      const items = Array.from(files).map(file => ({
+        id: 'f-' + Math.random().toString(36).slice(2, 10),
+        file, url: null, status: 'pending', markdown: '', errorMsg: '', method: ''
+      }));
+      fileQueue = [...fileQueue, ...items];
+      if (!activeFileId) activeFileId = items[0].id;
+      updateUI();
+      showToast(`Queued ${items.length} file${items.length > 1 ? 's' : ''}`, 'info');
+      processQueue();
+    }
+
+    function addUrlToQueue(url) {
+      if (!backendAvailable) { showToast('Start local server (Start_Markitdown.bat) for URL extraction', 'warning'); return; }
+      const item = {
+        id: 'u-' + Math.random().toString(36).slice(2, 10),
+        file: { name: url, size: 0, type: 'text/uri-list' },
+        url, status: 'pending', markdown: '', errorMsg: '', method: ''
+      };
+      fileQueue = [...fileQueue, item];
+      activeFileId = item.id;
+      updateUI();
+      processQueue();
+    }
+
+    async function processQueue() {
+      if (isProcessing) return;
+      isProcessing = true;
+      try {
+        while (true) {
+          const item = fileQueue.find(i => i.status === 'pending');
+          if (!item) break;
+          batchSpinner.classList.remove('hidden');
+          item.status = 'converting';
+          updateUI();
+          try {
+            item.markdown = await convertFileToMarkdown(item);
+            item.status = 'done';
+          } catch (err) {
+            item.status = 'error';
+            item.errorMsg = err.message || 'Conversion failed';
+          }
+          updateUI();
+        }
+      } finally {
+        isProcessing = false;
+        batchSpinner.classList.add('hidden');
+      }
+    }
+
+    function updateUI() {
+      const hasFiles = fileQueue.length > 0;
+      dropZoneHero.classList.toggle('hidden', hasFiles);
+      dropZoneCompact.classList.toggle('hidden', !hasFiles);
+      dropZone.classList.toggle('p-8', !hasFiles);
+      dropZone.classList.toggle('sm:p-11', !hasFiles);
+      dropZone.classList.toggle('p-4', hasFiles);
+      mainWorkspace.classList.toggle('justify-center', !hasFiles);
+      mainWorkspace.classList.toggle('items-center', !hasFiles);
+      mainWorkspace.classList.toggle('space-y-5', hasFiles);
+      mainWorkspace.classList.toggle('cafe-aura', !hasFiles);
+      uploadSection.classList.toggle('max-w-2xl', !hasFiles);
+      batchControlBar.classList.toggle('hidden', !hasFiles);
+      workspaceGrid.classList.toggle('hidden', !hasFiles);
+      if (!hasFiles) { activeFileId = null; return; }
+
+      const done = fileQueue.filter(i => i.status === 'done').length;
+      const pct = Math.round((done / fileQueue.length) * 100) || 0;
+      batchSummaryText.textContent = `Converted ${done} of ${fileQueue.length} items (${pct}%)`;
+      batchSizeText.textContent = `Payload: ${formatBytes(fileQueue.reduce((a, b) => a + (b.file.size || 0), 0))}`;
+      batchProgressBar.style.width = `${pct}%`;
+      queueCountBadge.textContent = fileQueue.length;
+      renderQueueList();
+      renderInspector();
+      refreshIcons();
+    }
+
+    function renderQueueList() {
+      const q = queueSearch.value.toLowerCase().trim();
+      const st = statusFilter.value;
+      const filtered = fileQueue.filter(i => i.file.name.toLowerCase().includes(q) && (st === 'all' || i.status === st));
+      fileQueueContainer.innerHTML = '';
+      if (!filtered.length) {
+        fileQueueContainer.innerHTML = `<div class="p-6 text-center rounded-xl border border-dashed border-[var(--border-hairline)] text-xs text-[var(--ink-muted)]">No matching items.</div>`;
+        return;
+      }
+      filtered.forEach(item => {
+        const active = item.id === activeFileId;
+        const card = document.createElement('div');
+        const edge = item.status === 'done' ? 'border-l-[var(--accent)]' : item.status === 'error' ? 'border-l-[var(--crimson)]' : item.status === 'converting' ? 'border-l-[var(--gold)]' : 'border-l-[var(--border-strong)]';
+        card.className = `p-3 rounded-xl border border-l-4 ${edge} cursor-pointer flex items-center justify-between gap-2 ${active ? 'bg-[var(--bg-elevated)] border-[var(--border-strong)]' : 'bg-[var(--bg-panel)] border-[var(--border-hairline)]'}`;
+        card.innerHTML = `
+          <div class="min-w-0">
+            <div class="text-xs font-semibold text-[var(--ink-primary)] truncate">${escapeHtml(item.file.name)}</div>
+            <div class="text-[11px] text-[var(--ink-muted)] font-mono mt-0.5">${item.url ? 'URL' : formatBytes(item.file.size)} / ${escapeHtml(item.method || item.status)}</div>
+            ${item.status === 'error' ? `<div class="text-[11px] text-[var(--crimson)] truncate">${escapeHtml(item.errorMsg)}</div>` : ''}
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            ${item.status === 'done' ? `<button type="button" data-act="copy" data-id="${item.id}" class="p-1.5 rounded-lg text-[var(--ink-secondary)] hover:text-[var(--accent)]"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>` : ''}
+            <button type="button" data-act="rm" data-id="${item.id}" class="p-1.5 rounded-lg text-[var(--ink-secondary)] hover:text-[var(--crimson)]"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+          </div>`;
+        card.addEventListener('click', e => {
+          const b = e.target.closest('button');
+          if (b) {
+            e.stopPropagation();
+            if (b.dataset.act === 'rm') { fileQueue = fileQueue.filter(x => x.id !== item.id); if (activeFileId === item.id) activeFileId = fileQueue[0]?.id || null; updateUI(); }
+            if (b.dataset.act === 'copy') { copyToClipboard(item.markdown); showToast('Copied Markdown', 'success'); }
+            return;
+          }
+          activeFileId = item.id; updateUI();
+        });
+        fileQueueContainer.appendChild(card);
+      });
+    }
+
+    function renderInspector() {
+      const item = fileQueue.find(i => i.id === activeFileId);
+      if (!item) { inspectorEmptyState.classList.remove('hidden'); inspectorViews.classList.add('hidden'); return; }
+      inspectorEmptyState.classList.add('hidden');
+      inspectorViews.classList.remove('hidden');
+      inspectorFileName.textContent = item.file.name;
+      inspectorFileSub.textContent = `${item.url ? 'URL' : formatBytes(item.file.size)} / ${item.method || item.status}`;
+      const text = item.status === 'done' ? item.markdown : item.status === 'error' ? `Error: ${item.errorMsg}` : 'Processing...';
+      markdownTextarea.value = text;
+      inspectorPreviewView.innerHTML = item.status === 'done' ? marked.parse(text) : `<p class="text-xs text-[var(--ink-muted)]">${escapeHtml(text)}</p>`;
+      inspectorCharCount.textContent = `${text.length.toLocaleString()} chars / ${(text.trim() ? text.trim().split(/\s+/).length : 0).toLocaleString()} words / ${text.split('\n').length} lines`;
+      inspectorStatusText.textContent = item.status === 'done' ? 'Ready' : item.status;
+      inspectorViews.classList.toggle('md:grid-cols-2', activeTab === 'split');
+      inspectorRawView.classList.toggle('hidden', activeTab === 'preview');
+      inspectorPreviewView.classList.toggle('hidden', activeTab === 'raw');
+
+      const activeCls = 'min-h-[32px] px-3 text-xs font-semibold rounded-lg bg-[var(--bg-elevated)] text-[var(--accent)]';
+      const inactiveCls = 'min-h-[32px] px-3 text-xs font-medium rounded-lg text-[var(--ink-muted)] hover:text-[var(--ink-primary)]';
+      tabRawBtn.className = activeTab === 'raw' ? activeCls : inactiveCls;
+      tabPreviewBtn.className = activeTab === 'preview' ? activeCls : inactiveCls;
+      tabSplitBtn.className = 'hidden md:inline-flex items-center ' + (activeTab === 'split' ? activeCls : inactiveCls);
+    }
+
+    // ── VIEW 2: LOCAL RAPIDOCR (IMAGE & PDF -> TEXT) ─────────────────────────
+    let currentOcrFile = null;
+    const ocrDropZone = document.getElementById('ocr-drop-zone');
+    const ocrFileInput = document.getElementById('ocr-file-input');
+    const ocrPreviewCard = document.getElementById('ocr-preview-card');
+    const ocrPreviewImg = document.getElementById('ocr-preview-img');
+    const ocrFileLabel = document.getElementById('ocr-file-label');
+    const ocrRotateSelect = document.getElementById('ocr-rotate-select');
+    const ocrOutputTextarea = document.getElementById('ocr-output-textarea');
+    const ocrMetaBadge = document.getElementById('ocr-meta-badge');
+
+    async function runOcrExtraction(file) {
+      if (!file) return;
+      currentOcrFile = file;
+      ocrFileLabel.textContent = `${file.name} (${formatBytes(file.size)})`;
+      ocrPreviewCard.classList.remove('hidden');
+      if (file.type.startsWith('image/')) {
+        ocrPreviewImg.src = URL.createObjectURL(file);
+        ocrPreviewImg.classList.remove('hidden');
+      } else {
+        ocrPreviewImg.classList.add('hidden');
+      }
+
+      if (!backendAvailable) {
+        showToast('Run Start_Markitdown.bat for RapidOCR engine', 'warning');
+        ocrMetaBadge.textContent = 'Server offline';
+        return;
+      }
+
+      ocrMetaBadge.textContent = 'Running RapidOCR...';
+      ocrOutputTextarea.value = 'Extracting text locally with RapidOCR (Baidu PaddleOCR ONNX)...';
+
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('rotate', ocrRotateSelect.value);
+        const res = await fetch(`${API_BASE}/api/ocr`, { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || `OCR failed (${res.status})`);
+        ocrOutputTextarea.value = data.text || '(No text detected)';
+        ocrMetaBadge.textContent = `${data.line_count} lines • ${data.avg_confidence}% conf • rot ${data.rotation_applied}°`;
+        showToast(`OCR complete (${data.line_count} lines extracted)`, 'success');
+      } catch (err) {
+        ocrOutputTextarea.value = `Error: ${err.message}`;
+        ocrMetaBadge.textContent = 'Error';
+        showToast(err.message, 'error');
+      }
+    }
+
+    // ── VIEW 3: LOCAL PDF TOOLKIT (iLovePDF Lokal) ───────────────────────────
+    let activePdfTool = 'merge';
+    let pdfSelectedFiles = [];
+
+    const PDF_TOOLS_META = {
+      merge: { title: 'Merge PDF', desc: 'Select 2 or more PDF files to combine in order.', accept: '.pdf', multiple: true, btn: 'Run Merge PDF' },
+      split: { title: 'Split PDF', desc: 'Extract specific page ranges or split every page into a ZIP.', accept: '.pdf', multiple: false, btn: 'Run Split PDF' },
+      rotate: { title: 'Rotate PDF', desc: 'Rotate all or chosen pages clockwise (90 / 180 / 270°).', accept: '.pdf', multiple: false, btn: 'Run Rotate PDF' },
+      compress: { title: 'Compress PDF', desc: 'Compress PDF streams and deduplicate objects locally.', accept: '.pdf', multiple: false, btn: 'Run Compress PDF' },
+      'to-images': { title: 'PDF to JPG/PNG', desc: 'Render every PDF page into high-res images inside a ZIP.', accept: '.pdf', multiple: false, btn: 'Render Images (.ZIP)' },
+      'from-images': { title: 'JPG/PNG to PDF', desc: 'Combine multiple photos/images into a single PDF document.', accept: '.jpg,.jpeg,.png,.webp,.bmp', multiple: true, btn: 'Create PDF' }
+    };
+
+    const pdfToolInput = document.getElementById('pdf-tool-input');
+    const pdfDropZone = document.getElementById('pdf-drop-zone');
+    const pdfFileList = document.getElementById('pdf-file-list');
+    const pdfResultInfo = document.getElementById('pdf-result-info');
+
+    function selectPdfTool(toolId) {
+      activePdfTool = toolId;
+      pdfSelectedFiles = [];
+      renderPdfFileList();
+      const meta = PDF_TOOLS_META[toolId];
+      document.getElementById('pdf-active-title').textContent = meta.title;
+      document.getElementById('pdf-active-desc').textContent = meta.desc;
+      document.getElementById('pdf-run-label').textContent = meta.btn;
+      document.getElementById('pdf-input-hint').textContent = `Accepts ${meta.accept} (${meta.multiple ? 'multiple files' : 'single file'})`;
+      pdfToolInput.accept = meta.accept;
+      pdfToolInput.multiple = meta.multiple;
+      pdfResultInfo.textContent = 'Ready';
+
+      document.querySelectorAll('.pdf-tool-card').forEach(btn => {
+        const active = btn.dataset.pdfTool === toolId;
+        btn.className = active
+          ? 'pdf-tool-card p-3.5 text-left rounded-2xl border border-[var(--accent)] bg-[var(--accent-soft)] transition-colors'
+          : 'pdf-tool-card p-3.5 text-left rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-panel)] hover:border-[var(--border-strong)] transition-colors';
+      });
+
+      document.getElementById('pdf-options-split').classList.toggle('hidden', toolId !== 'split');
+      document.getElementById('pdf-options-rotate').classList.toggle('hidden', toolId !== 'rotate');
+      document.getElementById('pdf-options-to-images').classList.toggle('hidden', toolId !== 'to-images');
+    }
+
+    function addFilesToPdfTool(fileList) {
+      const files = Array.from(fileList || []);
+      if (!files.length) return;
+      pdfSelectedFiles = PDF_TOOLS_META[activePdfTool].multiple ? [...pdfSelectedFiles, ...files] : files.slice(0, 1);
+      renderPdfFileList();
+      showToast(`Added ${files.length} file${files.length > 1 ? 's' : ''} to ${PDF_TOOLS_META[activePdfTool].title}`, 'info');
+    }
+
+    function renderPdfFileList() {
+      pdfFileList.innerHTML = '';
+      pdfFileList.classList.toggle('hidden', pdfSelectedFiles.length === 0);
+      pdfSelectedFiles.forEach((f, idx) => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-xs';
+        row.innerHTML = `<span class="truncate text-[var(--ink-primary)] font-mono">${idx + 1}. ${escapeHtml(f.name)} (${formatBytes(f.size)})</span><button type="button" data-idx="${idx}" class="text-[var(--ink-muted)] hover:text-[var(--crimson)]">Remove</button>`;
+        row.querySelector('button').addEventListener('click', () => {
+          pdfSelectedFiles.splice(idx, 1);
+          renderPdfFileList();
+        });
+        pdfFileList.appendChild(row);
+      });
+    }
+
+    async function runActivePdfTool() {
+      if (!backendAvailable) { showToast('Run Start_Markitdown.bat to use Local PDF Tools', 'warning'); return; }
+      if (!pdfSelectedFiles.length) { showToast('Select file(s) first', 'warning'); return; }
+      if (activePdfTool === 'merge' && pdfSelectedFiles.length < 2) { showToast('Select at least 2 PDF files to merge', 'warning'); return; }
+
+      const runBtn = document.getElementById('pdf-run-btn');
+      runBtn.disabled = true;
+      pdfResultInfo.textContent = 'Processing locally...';
+
+      try {
+        const fd = new FormData();
+        if (activePdfTool === 'merge' || activePdfTool === 'from-images') {
+          pdfSelectedFiles.forEach(f => fd.append('files', f));
+        } else {
+          fd.append('file', pdfSelectedFiles[0]);
+        }
+
+        if (activePdfTool === 'split') {
+          fd.append('pages', document.getElementById('pdf-split-pages').value);
+          fd.append('mode', document.getElementById('pdf-split-mode').value);
+        } else if (activePdfTool === 'rotate') {
+          fd.append('angle', document.getElementById('pdf-rotate-angle').value);
+          fd.append('pages', document.getElementById('pdf-rotate-pages').value);
+        } else if (activePdfTool === 'to-images') {
+          fd.append('img_format', document.getElementById('pdf-img-format').value);
+          fd.append('dpi', document.getElementById('pdf-img-dpi').value);
+        }
+
+        const res = await fetch(`${API_BASE}/api/pdf/${activePdfTool}`, { method: 'POST', body: fd });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || errData.error || `Failed (${res.status})`);
+        }
+
+        const blob = await res.blob();
+        const disp = res.headers.get('Content-Disposition') || '';
+        const match = disp.match(/filename="([^"]+)"/);
+        const filename = match ? match[1] : `folio_${activePdfTool}.pdf`;
+
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.click();
+
+        const orig = Number(res.headers.get('X-Original-Size') || 0);
+        const comp = Number(res.headers.get('X-Compressed-Size') || 0);
+        if (orig && comp) {
+          const saved = Math.max(0, Math.round((1 - comp / orig) * 100));
+          pdfResultInfo.textContent = `Downloaded ${filename} (${formatBytes(orig)} -> ${formatBytes(comp)}, -${saved}%)`;
+        } else {
+          pdfResultInfo.textContent = `Downloaded ${filename} (${formatBytes(blob.size)})`;
+        }
+        showToast(`Saved ${filename}`, 'success');
+      } catch (err) {
+        pdfResultInfo.textContent = `Error: ${err.message}`;
+        showToast(err.message, 'error');
+      } finally {
+        runBtn.disabled = false;
+      }
+    }
+
+    // ── Full-Tab (100% Viewport) Drag & Drop Controller ──────────────────────
+    function setupGlobalDragAndDrop() {
+      const overlay = document.getElementById('global-drop-overlay');
+      const titleEl = document.getElementById('global-drop-title');
+      const subEl = document.getElementById('global-drop-sub');
+      let dragDepth = 0;
+
+      function updateOverlayCopy() {
+        if (activeMainView === 'ocr') {
+          titleEl.textContent = 'Drop image or scanned PDF for RapidOCR';
+          subEl.textContent = 'Extracts plain text with automatic rotation detection';
+        } else if (activeMainView === 'pdf') {
+          const meta = PDF_TOOLS_META[activePdfTool];
+          titleEl.textContent = `Drop files for ${meta.title}`;
+          subEl.textContent = meta.desc;
+        } else {
+          titleEl.textContent = 'Drop files to convert to Markdown';
+          subEl.textContent = 'Unlimited local batch conversion via Microsoft MarkItDown';
+        }
+      }
+
+      window.addEventListener('dragenter', (e) => {
+        if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes('Files')) return;
+        e.preventDefault();
+        dragDepth++;
+        updateOverlayCopy();
+        overlay.classList.remove('hidden');
+      });
+
+      window.addEventListener('dragover', (e) => {
+        if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes('Files')) return;
+        e.preventDefault();
+      });
+
+      window.addEventListener('dragleave', (e) => {
+        if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes('Files')) return;
+        dragDepth = Math.max(0, dragDepth - 1);
+        if (dragDepth === 0) {
+          overlay.classList.add('hidden');
+        }
+      });
+
+      window.addEventListener('drop', (e) => {
+        if (!e.dataTransfer || !e.dataTransfer.files || !e.dataTransfer.files.length) return;
+        e.preventDefault();
+        dragDepth = 0;
+        overlay.classList.add('hidden');
+
+        const droppedFiles = e.dataTransfer.files;
+        if (activeMainView === 'ocr') {
+          runOcrExtraction(droppedFiles[0]);
+        } else if (activeMainView === 'pdf') {
+          addFilesToPdfTool(droppedFiles);
+        } else {
+          addFilesToQueue(droppedFiles);
+        }
+      });
+    }
+
+    // ── Wire All Events ──────────────────────────────────────────────────────
+    function setupEvents() {
+      setupGlobalDragAndDrop();
+
+      document.querySelectorAll('.t-expanding-tab').forEach(btn => {
+        btn.addEventListener('click', () => switchMainView(btn.dataset.view));
+      });
+
+      // Convert view
+      dropZone.addEventListener('click', () => fileInput.click());
+      dropZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
+      fileInput.addEventListener('change', e => { addFilesToQueue(e.target.files); fileInput.value = ''; });
+      urlConvertForm.addEventListener('submit', e => { e.preventDefault(); if (urlInput.value.trim()) { addUrlToQueue(urlInput.value.trim()); urlInput.value = ''; } });
+
+      queueSearch.addEventListener('input', renderQueueList);
+      statusFilter.addEventListener('change', renderQueueList);
+      document.getElementById('clear-queue-btn').addEventListener('click', () => { fileQueue = []; activeFileId = null; updateUI(); });
+      document.getElementById('download-zip-btn').addEventListener('click', async () => {
+        const done = fileQueue.filter(i => i.status === 'done');
+        if (!done.length) return;
+        const zip = new JSZip();
+        done.forEach((it, idx) => zip.file((it.file.name.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.[^/.]+$/, '') || `file_${idx+1}`) + '.md', it.markdown));
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(await zip.generateAsync({ type: 'blob' }));
+        a.download = `folio_local_${Date.now()}.zip`;
+        a.click();
+      });
+      document.getElementById('copy-md-btn').addEventListener('click', () => {
+        const it = fileQueue.find(i => i.id === activeFileId);
+        if (it?.markdown) { copyToClipboard(it.markdown); showToast('Copied Markdown', 'success'); }
+      });
+      document.getElementById('download-single-btn').addEventListener('click', () => {
+        const it = fileQueue.find(i => i.id === activeFileId);
+        if (!it?.markdown) return;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([it.markdown], { type: 'text/markdown;charset=utf-8' }));
+        a.download = (it.file.name.replace(/\.[^/.]+$/, '') || 'output') + '.md';
+        a.click();
+      });
+      document.getElementById('toggle-wrap-btn').addEventListener('click', () => { lineWrap = !lineWrap; markdownTextarea.style.whiteSpace = lineWrap ? 'pre-wrap' : 'pre'; });
+      tabRawBtn.addEventListener('click', () => { activeTab = 'raw'; renderInspector(); });
+      tabPreviewBtn.addEventListener('click', () => { activeTab = 'preview'; renderInspector(); });
+      tabSplitBtn.addEventListener('click', () => { activeTab = 'split'; renderInspector(); });
+
+      // OCR view
+      ocrDropZone.addEventListener('click', () => ocrFileInput.click());
+      ocrDropZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ocrFileInput.click(); } });
+      ocrFileInput.addEventListener('change', e => { if (e.target.files[0]) runOcrExtraction(e.target.files[0]); ocrFileInput.value = ''; });
+      document.getElementById('ocr-rerun-btn').addEventListener('click', () => { if (currentOcrFile) runOcrExtraction(currentOcrFile); });
+      document.getElementById('ocr-copy-btn').addEventListener('click', () => { if (ocrOutputTextarea.value) { copyToClipboard(ocrOutputTextarea.value); showToast('Copied OCR text', 'success'); } });
+      document.getElementById('ocr-download-txt-btn').addEventListener('click', () => {
+        if (!ocrOutputTextarea.value) return;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([ocrOutputTextarea.value], { type: 'text/plain;charset=utf-8' }));
+        a.download = ((currentOcrFile?.name || 'ocr_output').replace(/\.[^/.]+$/, '')) + '.txt';
+        a.click();
+      });
+
+      // PDF Toolkit view
+      document.querySelectorAll('.pdf-tool-card').forEach(btn => btn.addEventListener('click', () => selectPdfTool(btn.dataset.pdfTool)));
+      pdfDropZone.addEventListener('click', () => pdfToolInput.click());
+      pdfDropZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pdfToolInput.click(); } });
+      pdfToolInput.addEventListener('change', e => { addFilesToPdfTool(e.target.files); pdfToolInput.value = ''; });
+      document.getElementById('pdf-clear-files-btn').addEventListener('click', () => { pdfSelectedFiles = []; renderPdfFileList(); });
+      document.getElementById('pdf-run-btn').addEventListener('click', runActivePdfTool);
+
+      // Header utilities
+      document.getElementById('theme-toggle-btn').addEventListener('click', () => applyTheme(document.documentElement.classList.contains('dark') ? 'light' : 'dark'));
+
+      const settingsModal = document.getElementById('settings-modal');
+      const closeModal = () => settingsModal.classList.add('hidden');
+      document.getElementById('open-settings-btn').addEventListener('click', () => settingsModal.classList.remove('hidden'));
+      document.getElementById('close-settings-btn').addEventListener('click', closeModal);
+      document.getElementById('cancel-settings-btn').addEventListener('click', closeModal);
+      settingsModal.addEventListener('click', e => { if (e.target === settingsModal) closeModal(); });
+      document.addEventListener('keydown', e => { if (e.key === 'Escape' && !settingsModal.classList.contains('hidden')) closeModal(); });
+      document.getElementById('save-settings-btn').addEventListener('click', () => {
+        settings.enableFrontmatter = document.getElementById('opt-frontmatter').checked;
+        settings.headingStyle = document.getElementById('opt-heading-style').value;
+        settings.codeFence = document.getElementById('opt-code-fence').value;
+        settings.gfmTables = document.getElementById('opt-gfm-tables').checked;
+        settings.enablePdfOcr = document.getElementById('opt-pdf-ocr').checked;
+        settings.ocrLang = document.getElementById('opt-ocr-lang').value;
+        settings.llmBaseUrl = document.getElementById('opt-llm-base-url').value.trim();
+        settings.llmModel = document.getElementById('opt-llm-model').value.trim();
+        settings.llmApiKey = document.getElementById('opt-llm-api-key').value.trim();
+        closeModal();
+        showToast('Settings applied', 'success');
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initTheme();
+      setupEvents();
+      selectPdfTool('merge');
+      refreshIcons();
+      detectBackend();
+    });
+  </script>
+</body>
+</html>
