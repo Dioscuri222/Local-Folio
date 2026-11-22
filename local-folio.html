@@ -362,9 +362,9 @@
           <span class="t-expanding-label-wrap"><span class="t-expanding-label">PDF Tools</span></span>
         </button>
 
-        <span class="w-px h-5 bg-[var(--border-strong)]/60 mx-0.5 shrink-0" aria-hidden="true"></span>
-        <button id="open-search-btn" type="button" class="t-expanding-tab" title="Search tools &amp; features (Ctrl+K)" aria-label="Search features">
+        <button id="open-search-btn" type="button" role="tab" aria-selected="false" class="t-expanding-tab" title="Search tools &amp; features (Ctrl+K)" aria-label="Search">
           <i data-lucide="search" class="w-[18px] h-[18px] shrink-0" aria-hidden="true"></i>
+          <span class="t-expanding-label-wrap"><span class="t-expanding-label">Search</span></span>
         </button>
       </nav>
 
@@ -668,8 +668,8 @@
       <div id="pdf-tool-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
     </div>
 
-    <!-- State B: Focused Active Tool Workspace -->
-    <div id="pdf-workspace-view" class="hidden max-w-3xl mx-auto space-y-6 t-view-enter">
+    <!-- State B: Focused Active Tool Workspace (Expands to 2-Col Live Preview Studio when files added) -->
+    <div id="pdf-workspace-view" class="hidden max-w-3xl mx-auto space-y-6 t-view-enter transition-all duration-200">
       <div class="flex items-center justify-between gap-3">
         <button id="pdf-back-directory-btn" type="button" class="inline-flex items-center gap-2 min-h-[40px] px-3.5 text-xs font-semibold rounded-xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] hover:border-[var(--accent)] text-[var(--ink-primary)] transition-colors">
           <i data-lucide="arrow-left" class="w-4 h-4 text-[var(--accent)]"></i>
@@ -683,7 +683,26 @@
         <p id="pdf-active-desc" class="text-sm text-[var(--ink-secondary)] max-w-xl mx-auto">Select 2 or more PDF files to merge into a single document.</p>
       </div>
 
-      <div class="card-elevated rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] p-5 sm:p-7 space-y-5">
+      <div id="pdf-workspace-grid" class="grid grid-cols-1 gap-6 items-start">
+        <!-- Left: Real-Time Visual Preview Stage (shown automatically when files are loaded) -->
+        <div id="pdf-preview-stage" class="hidden lg:col-span-7 rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] card-elevated p-4 sm:p-5 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[var(--border-hairline)]">
+            <div class="flex items-center gap-2 min-w-0">
+              <i data-lucide="eye" class="w-4 h-4 text-[var(--accent)] shrink-0"></i>
+              <span class="text-xs font-semibold text-[var(--ink-primary)]">Live Preview</span>
+              <span id="pdf-preview-meta" class="text-[11px] font-mono px-2 py-0.5 rounded-md bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--accent)] truncate">Ready</span>
+            </div>
+            <button id="pdf-add-more-btn" type="button" class="inline-flex items-center gap-1.5 min-h-[34px] px-3 text-xs font-semibold rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-strong)] hover:border-[var(--accent)] text-[var(--ink-primary)] transition-colors">
+              <i data-lucide="plus" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+              <span>Add Files</span>
+            </button>
+          </div>
+          <div id="pdf-preview-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[640px] overflow-y-auto p-1"></div>
+          <p id="pdf-preview-hint" class="hidden text-[11px] text-[var(--ink-muted)] text-center font-mono"></p>
+        </div>
+
+        <!-- Right (or Center when empty): Drop Zone + Tool Options + Action Card -->
+        <div id="pdf-options-card" class="card-elevated rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] p-5 sm:p-7 space-y-5">
         <div id="pdf-drop-zone" role="button" tabindex="0" class="border-2 border-dashed border-[var(--border-strong)] hover:border-[var(--accent)] rounded-2xl bg-[var(--bg-canvas)]/60 p-8 sm:p-10 text-center cursor-pointer transition-colors">
           <input type="file" id="pdf-tool-input" multiple class="hidden" accept=".pdf" />
           <div class="mx-auto w-12 h-12 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--accent)] mb-3 pointer-events-none">
@@ -693,7 +712,7 @@
           <p id="pdf-input-hint" class="text-xs text-[var(--ink-muted)] mt-1 pointer-events-none">Accepts .pdf files</p>
         </div>
 
-        <div id="pdf-file-list" class="hidden space-y-2 max-h-56 overflow-y-auto"></div>
+        <div id="pdf-file-list" class="hidden space-y-2 max-h-48 overflow-y-auto"></div>
 
         <!-- Merge Options -->
         <div id="pdf-options-merge" class="hidden space-y-3">
@@ -1228,6 +1247,7 @@
           </div>
         </div>
       </div>
+      </div>
     </div>
   </section>
 
@@ -1406,6 +1426,8 @@
 
     function switchMainView(viewName) {
       activeMainView = viewName;
+      const searchBtn = document.getElementById('open-search-btn');
+      if (searchBtn) searchBtn.setAttribute('aria-selected', 'false');
       document.querySelectorAll('.t-expanding-tab[data-view]').forEach(btn => {
         const active = btn.getAttribute('data-view') === viewName;
         btn.setAttribute('aria-selected', String(active));
@@ -2396,7 +2418,12 @@
         ctx.lineTo(p.x, p.y);
         ctx.stroke();
       };
-      const end = () => { drawing = false; };
+      const end = () => {
+        if (drawing) {
+          drawing = false;
+          renderPdfLivePreview();
+        }
+      };
 
       canvas.addEventListener('mousedown', start);
       canvas.addEventListener('mousemove', move);
@@ -2408,6 +2435,7 @@
       document.getElementById('pdf-sign-clear-btn').addEventListener('click', () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         sigHasDrawn = false;
+        renderPdfLivePreview();
       });
     }
 
@@ -2421,9 +2449,438 @@
         group.querySelectorAll('.opt-tile').forEach(btn => {
           btn.addEventListener('click', () => {
             group.querySelectorAll('.opt-tile').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+            renderPdfLivePreview();
           });
         });
       });
+    }
+
+    // ── Real-Time Visual Preview Engine for PDF Tools ────────────────────────
+    const pdfPreviewCache = new WeakMap(); // File -> { kind, pages: [{page, src, w, h}], totalPages, url, htmlText }
+    let pdfPreviewRenderSeq = 0;
+
+    function parsePageRangeClient(str, total) {
+      const res = new Set();
+      if (!str || !str.trim()) return res;
+      str.split(',').forEach(part => {
+        const tok = part.trim();
+        if (!tok) return;
+        if (tok.includes('-')) {
+          const [a, b] = tok.split('-').map(x => parseInt(x.trim(), 10));
+          if (!isNaN(a) && !isNaN(b)) {
+            for (let p = Math.max(1, a); p <= Math.min(total, b); p++) res.add(p);
+          }
+        } else {
+          const p = parseInt(tok, 10);
+          if (!isNaN(p) && p >= 1 && p <= total) res.add(p);
+        }
+      });
+      return res;
+    }
+
+    function togglePageInInput(inputId, pageNum, totalPages) {
+      const inp = document.getElementById(inputId);
+      if (!inp) return;
+      const current = parsePageRangeClient(inp.value, totalPages);
+      if (current.has(pageNum)) current.delete(pageNum);
+      else current.add(pageNum);
+      inp.value = Array.from(current).sort((a, b) => a - b).join(', ');
+      renderPdfLivePreview();
+    }
+
+    async function ensureFilePreviewData(file, maxPages = 12) {
+      if (pdfPreviewCache.has(file)) {
+        const cached = pdfPreviewCache.get(file);
+        if (cached.kind !== 'pdf' || cached.renderedLimit >= maxPages) return cached;
+      }
+
+      const nameLower = (file.name || '').toLowerCase();
+      if (file.type.startsWith('image/') || /\.(jpg|jpeg|png|webp|bmp|gif)$/.test(nameLower)) {
+        const url = URL.createObjectURL(file);
+        const dims = await new Promise((resolve) => {
+          const im = new Image();
+          im.onload = () => resolve({ w: im.naturalWidth || 800, h: im.naturalHeight || 1000 });
+          im.onerror = () => resolve({ w: 800, h: 1000 });
+          im.src = url;
+        });
+        const entry = { kind: 'image', url, w: dims.w, h: dims.h };
+        pdfPreviewCache.set(file, entry);
+        return entry;
+      }
+
+      if (nameLower.endsWith('.pdf') && window.pdfjsLib) {
+        try {
+          const buf = await file.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+          const total = pdf.numPages;
+          const limit = Math.min(total, maxPages);
+          const pages = [];
+          for (let i = 1; i <= limit; i++) {
+            const page = await pdf.getPage(i);
+            const vp = page.getViewport({ scale: 0.72 });
+            const cv = document.createElement('canvas');
+            cv.width = Math.max(1, Math.floor(vp.width));
+            cv.height = Math.max(1, Math.floor(vp.height));
+            await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+            pages.push({ page: i, src: cv.toDataURL('image/jpeg', 0.82), w: vp.width, h: vp.height });
+          }
+          const entry = { kind: 'pdf', totalPages: total, pages, renderedLimit: maxPages };
+          pdfPreviewCache.set(file, entry);
+          return entry;
+        } catch (err) {
+          const entry = { kind: 'pdf-locked', totalPages: 0, pages: [], error: err.message || 'Encrypted or unreadable PDF' };
+          pdfPreviewCache.set(file, entry);
+          return entry;
+        }
+      }
+
+      if (/\.(html|htm)$/.test(nameLower)) {
+        const htmlText = await file.text();
+        const entry = { kind: 'html', htmlText };
+        pdfPreviewCache.set(file, entry);
+        return entry;
+      }
+
+      const entry = { kind: 'doc', ext: (nameLower.split('.').pop() || 'file').toUpperCase() };
+      pdfPreviewCache.set(file, entry);
+      return entry;
+    }
+
+    function updatePdfWorkspaceLayout() {
+      const hasFiles = pdfSelectedFiles.length > 0;
+      const wsView = document.getElementById('pdf-workspace-view');
+      const wsGrid = document.getElementById('pdf-workspace-grid');
+      const stage = document.getElementById('pdf-preview-stage');
+      const optsCard = document.getElementById('pdf-options-card');
+      const dropZoneEl = document.getElementById('pdf-drop-zone');
+
+      wsView.classList.toggle('max-w-3xl', !hasFiles);
+      wsView.classList.toggle('max-w-6xl', hasFiles);
+      wsGrid.classList.toggle('lg:grid-cols-12', hasFiles);
+      stage.classList.toggle('hidden', !hasFiles);
+      optsCard.classList.toggle('lg:col-span-5', hasFiles);
+      optsCard.classList.toggle('lg:sticky', hasFiles);
+      optsCard.classList.toggle('lg:top-24', hasFiles);
+      dropZoneEl.classList.toggle('hidden', hasFiles);
+    }
+
+    async function renderPdfLivePreview() {
+      updatePdfWorkspaceLayout();
+      if (!pdfSelectedFiles.length) return;
+
+      const seq = ++pdfPreviewRenderSeq;
+      const grid = document.getElementById('pdf-preview-grid');
+      const metaEl = document.getElementById('pdf-preview-meta');
+      const hintEl = document.getElementById('pdf-preview-hint');
+      hintEl.classList.add('hidden');
+      hintEl.textContent = '';
+
+      // 1. IMAGE TO PDF — Exact real-time paper sheet preview (Orientation, Page Size, Margin)
+      if (activePdfTool === 'from-images') {
+        const orient = getOptTileValue('img2pdf-orientation', 'portrait');
+        const pageSize = document.getElementById('pdf-from-img-size').value;
+        const margin = getOptTileValue('img2pdf-margin', 'none');
+        const mergeAll = document.getElementById('pdf-from-img-merge').checked;
+
+        const sizeLabels = { fit: 'Fit', a4: 'A4', letter: 'US Letter' };
+        const marginLabels = { none: 'No margin', small: 'Small margin', big: 'Big margin' };
+        metaEl.textContent = `${pdfSelectedFiles.length} img • ${sizeLabels[pageSize]} • ${orient === 'landscape' ? 'Landscape' : 'Portrait'} • ${marginLabels[margin]}`;
+        hintEl.textContent = mergeAll ? 'Output: 1 merged PDF file' : `Output: .ZIP with ${pdfSelectedFiles.length} separate PDF files`;
+        hintEl.classList.remove('hidden');
+
+        const items = await Promise.all(pdfSelectedFiles.map(f => ensureFilePreviewData(f)));
+        if (seq !== pdfPreviewRenderSeq) return;
+
+        grid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[640px] overflow-y-auto p-1';
+        grid.innerHTML = '';
+
+        const padPx = margin === 'none' ? 0 : (margin === 'small' ? 12 : 26);
+
+        items.forEach((info, idx) => {
+          const f = pdfSelectedFiles[idx];
+          let aspectRatio = '210 / 297';
+          if (pageSize === 'a4') {
+            aspectRatio = orient === 'landscape' ? '297 / 210' : '210 / 297';
+          } else if (pageSize === 'letter') {
+            aspectRatio = orient === 'landscape' ? '279.4 / 215.9' : '215.9 / 279.4';
+          } else {
+            let iw = info.w || 800, ih = info.h || 1000;
+            if (orient === 'landscape' && ih > iw) [iw, ih] = [ih, iw];
+            if (orient === 'portrait' && iw > ih) [iw, ih] = [ih, iw];
+            aspectRatio = `${iw} / ${ih}`;
+          }
+
+          const card = document.createElement('div');
+          card.className = 'rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] p-3 flex flex-col gap-2.5';
+          card.innerHTML = `
+            <div class="w-full flex items-center justify-center bg-[var(--bg-canvas)] rounded-xl p-3 min-h-[220px]">
+              <div class="bg-white shadow-md border border-black/10 overflow-hidden flex items-center justify-center transition-all duration-200" style="aspect-ratio: ${aspectRatio}; width: ${orient === 'landscape' ? '100%' : '76%'}; max-height: 250px; padding: ${padPx}px;">
+                <img src="${info.url}" alt="${escapeHtml(f.name)}" class="w-full h-full object-contain block" />
+              </div>
+            </div>
+            <div class="flex items-center justify-between gap-2 text-[11px]">
+              <span class="font-mono text-[var(--ink-primary)] truncate">${idx + 1}. ${escapeHtml(f.name)}</span>
+              <div class="flex items-center gap-1 shrink-0">
+                ${pdfSelectedFiles.length > 1 ? `<button type="button" data-op="up" class="px-1.5 py-0.5 rounded bg-[var(--bg-panel)] border border-[var(--border-hairline)] text-[var(--ink-secondary)] hover:text-[var(--accent)]" title="Move earlier">◀</button><button type="button" data-op="down" class="px-1.5 py-0.5 rounded bg-[var(--bg-panel)] border border-[var(--border-hairline)] text-[var(--ink-secondary)] hover:text-[var(--accent)]" title="Move later">▶</button>` : ''}
+                <button type="button" data-op="rm" class="px-1.5 py-0.5 rounded bg-[var(--bg-panel)] border border-[var(--border-hairline)] text-[var(--ink-muted)] hover:text-[var(--crimson)]" title="Remove">×</button>
+              </div>
+            </div>`;
+          card.querySelectorAll('button').forEach(b => {
+            b.addEventListener('click', () => {
+              if (b.dataset.op === 'up' && idx > 0) [pdfSelectedFiles[idx - 1], pdfSelectedFiles[idx]] = [pdfSelectedFiles[idx], pdfSelectedFiles[idx - 1]];
+              else if (b.dataset.op === 'down' && idx < pdfSelectedFiles.length - 1) [pdfSelectedFiles[idx + 1], pdfSelectedFiles[idx]] = [pdfSelectedFiles[idx], pdfSelectedFiles[idx + 1]];
+              else if (b.dataset.op === 'rm') pdfSelectedFiles.splice(idx, 1);
+              renderPdfFileList();
+            });
+          });
+          grid.appendChild(card);
+        });
+        refreshIcons();
+        return;
+      }
+
+      // 2. MULTI-PDF TOOLS (Merge, Compare, Workflow) — Cover thumbnail per PDF file
+      if (['merge', 'compare', 'workflow'].includes(activePdfTool)) {
+        metaEl.textContent = `${pdfSelectedFiles.length} PDF file${pdfSelectedFiles.length > 1 ? 's' : ''}`;
+        grid.className = 'grid grid-cols-2 sm:grid-cols-3 gap-3.5 max-h-[640px] overflow-y-auto p-1';
+        grid.innerHTML = '<div class="col-span-full text-center py-8 text-xs font-mono text-[var(--ink-muted)]">Rendering PDF previews...</div>';
+
+        const infos = await Promise.all(pdfSelectedFiles.map(f => ensureFilePreviewData(f, 1)));
+        if (seq !== pdfPreviewRenderSeq) return;
+
+        grid.innerHTML = '';
+        infos.forEach((info, idx) => {
+          const f = pdfSelectedFiles[idx];
+          const cover = info.pages?.[0]?.src;
+          const card = document.createElement('div');
+          card.className = 'rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] p-2.5 flex flex-col gap-2';
+          card.innerHTML = `
+            <div class="relative w-full aspect-[3/4] rounded-xl bg-white border border-[var(--border-hairline)] overflow-hidden flex items-center justify-center">
+              ${cover ? `<img src="${cover}" alt="${escapeHtml(f.name)}" class="w-full h-full object-contain" />` : `<i data-lucide="file-text" class="w-8 h-8 text-[var(--accent)]"></i>`}
+              <span class="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-[var(--ink-primary)]/85 text-[var(--bg-panel)] text-[10px] font-mono">${info.totalPages ? info.totalPages + 'p' : 'PDF'}</span>
+            </div>
+            <div class="flex items-center justify-between gap-1 text-[11px]">
+              <span class="font-mono text-[var(--ink-primary)] truncate">${idx + 1}. ${escapeHtml(f.name)}</span>
+              <div class="flex items-center gap-0.5 shrink-0">
+                ${pdfSelectedFiles.length > 1 ? `<button type="button" data-op="up" class="px-1 rounded hover:bg-[var(--bg-panel)] text-[var(--ink-secondary)]">◀</button><button type="button" data-op="down" class="px-1 rounded hover:bg-[var(--bg-panel)] text-[var(--ink-secondary)]">▶</button>` : ''}
+                <button type="button" data-op="rm" class="px-1 rounded hover:bg-[var(--crimson-soft)] text-[var(--crimson)]">×</button>
+              </div>
+            </div>`;
+          card.querySelectorAll('button').forEach(b => {
+            b.addEventListener('click', () => {
+              if (b.dataset.op === 'up' && idx > 0) [pdfSelectedFiles[idx - 1], pdfSelectedFiles[idx]] = [pdfSelectedFiles[idx], pdfSelectedFiles[idx - 1]];
+              else if (b.dataset.op === 'down' && idx < pdfSelectedFiles.length - 1) [pdfSelectedFiles[idx + 1], pdfSelectedFiles[idx]] = [pdfSelectedFiles[idx], pdfSelectedFiles[idx + 1]];
+              else if (b.dataset.op === 'rm') pdfSelectedFiles.splice(idx, 1);
+              renderPdfFileList();
+            });
+          });
+          grid.appendChild(card);
+        });
+        refreshIcons();
+        return;
+      }
+
+      // 3. SINGLE FILE TOOLS (PDF / HTML / Office)
+      const firstFile = pdfSelectedFiles[0];
+      grid.innerHTML = '<div class="col-span-full text-center py-8 text-xs font-mono text-[var(--ink-muted)]">Rendering live preview...</div>';
+      const info = await ensureFilePreviewData(firstFile, 12);
+      if (seq !== pdfPreviewRenderSeq) return;
+
+      if (info.kind === 'html') {
+        const orient = document.getElementById('pdf-html-orientation')?.value || 'portrait';
+        const pageSize = document.getElementById('pdf-html-size')?.value || 'a4';
+        const margin = document.getElementById('pdf-html-margin')?.value || 'small';
+        const padPx = margin === 'none' ? 0 : (margin === 'small' ? 12 : 24);
+        const ratio = pageSize === 'letter'
+          ? (orient === 'landscape' ? '279.4 / 215.9' : '215.9 / 279.4')
+          : (orient === 'landscape' ? '297 / 210' : '210 / 297');
+        metaEl.textContent = `HTML • ${pageSize.toUpperCase()} • ${orient}`;
+        grid.className = 'grid grid-cols-1 gap-3';
+        grid.innerHTML = `
+          <div class="rounded-2xl bg-[var(--bg-canvas)] border border-[var(--border-hairline)] p-4 flex justify-center">
+            <div class="bg-white shadow-md border border-black/10 overflow-hidden w-full max-w-[440px]" style="aspect-ratio: ${ratio}; padding: ${padPx}px;">
+              <iframe sandbox="" class="w-full h-full border-0 pointer-events-none" srcdoc="${escapeHtml(info.htmlText)}"></iframe>
+            </div>
+          </div>`;
+        return;
+      }
+
+      if (info.kind === 'doc' || info.kind === 'pdf-locked') {
+        metaEl.textContent = info.kind === 'pdf-locked' ? 'Encrypted PDF' : `${info.ext} Document`;
+        grid.className = 'grid grid-cols-1 gap-3';
+        grid.innerHTML = `
+          <div class="rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] p-8 text-center space-y-2.5">
+            <div class="mx-auto w-14 h-14 rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--accent)]">
+              <i data-lucide="${info.kind === 'pdf-locked' ? 'lock' : 'file-text'}" class="w-7 h-7"></i>
+            </div>
+            <p class="text-sm font-semibold text-[var(--ink-primary)] truncate">${escapeHtml(firstFile.name)}</p>
+            <p class="text-xs font-mono text-[var(--ink-muted)]">${formatBytes(firstFile.size)} ${info.kind === 'pdf-locked' ? '• Password-protected (enter password to unlock)' : '• Ready for native local PDF conversion'}</p>
+          </div>`;
+        refreshIcons();
+        return;
+      }
+
+      // PDF Page-by-Page Real-Time Visual Preview with Tool-Specific Overlays!
+      const total = info.totalPages;
+      const pages = info.pages;
+      metaEl.textContent = `${total} page${total > 1 ? 's' : ''}${total > pages.length ? ` (showing first ${pages.length})` : ''}`;
+
+      const singlePageFocus = ['watermark', 'page-numbers', 'crop', 'sign'].includes(activePdfTool);
+      grid.className = singlePageFocus
+        ? 'grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[640px] overflow-y-auto p-1'
+        : 'grid grid-cols-2 sm:grid-cols-3 gap-3.5 max-h-[640px] overflow-y-auto p-1';
+      grid.innerHTML = '';
+
+      // Compute active tool overlay parameters
+      const rotAngle = Number(document.getElementById('pdf-rotate-angle')?.value || 90);
+      const rotPages = parsePageRangeClient(document.getElementById('pdf-rotate-pages')?.value || '', total);
+      const rmPages = parsePageRangeClient(document.getElementById('pdf-remove-pages-input')?.value || '', total);
+      const splitPages = parsePageRangeClient(document.getElementById('pdf-split-pages')?.value || '', total);
+      const rangeInputMap = { 'to-images': 'pdf-img-pages', 'to-word': 'pdf-word-pages', 'to-pptx': 'pdf-pptx-pages' };
+      const highlightRange = rangeInputMap[activePdfTool]
+        ? parsePageRangeClient(document.getElementById(rangeInputMap[activePdfTool])?.value || '', total)
+        : new Set();
+
+      const wmText = (document.getElementById('pdf-wm-text')?.value || 'CONFIDENTIAL').trim();
+      const wmOpacity = Number(document.getElementById('pdf-wm-opacity')?.value || 0.25);
+      const wmAngle = Number(document.getElementById('pdf-wm-angle')?.value || 45);
+      const wmPos = document.getElementById('pdf-wm-pos')?.value || 'center';
+
+      const pnPos = document.getElementById('pdf-pn-pos')?.value || 'bottom-center';
+      const pnFmt = document.getElementById('pdf-pn-fmt')?.value || 'page_of';
+      const pnStart = Number(document.getElementById('pdf-pn-start')?.value || 1);
+
+      const cropUnit = document.getElementById('pdf-crop-unit')?.value || 'mm';
+      const cropTop = Number(document.getElementById('pdf-crop-top')?.value || 0);
+      const cropRight = Number(document.getElementById('pdf-crop-right')?.value || 0);
+      const cropBottom = Number(document.getElementById('pdf-crop-bottom')?.value || 0);
+      const cropLeft = Number(document.getElementById('pdf-crop-left')?.value || 0);
+      const cropPages = parsePageRangeClient(document.getElementById('pdf-crop-pages')?.value || '', total);
+
+      const signCanvas = document.getElementById('pdf-sign-canvas');
+      const signDataUrl = (activePdfTool === 'sign' && sigHasDrawn && signCanvas) ? signCanvas.toDataURL('image/png') : '';
+      const signPageSpec = (document.getElementById('pdf-sign-page')?.value || 'last').trim().toLowerCase();
+      const signPos = document.getElementById('pdf-sign-pos')?.value || 'bottom-right';
+      const signWidth = Math.max(10, Math.min(60, Number(document.getElementById('pdf-sign-width')?.value || 24)));
+      const signPageSet = signPageSpec === 'all' ? null : (signPageSpec === 'last' ? new Set([total]) : parsePageRangeClient(signPageSpec, total));
+
+      if (activePdfTool === 'remove-pages') {
+        hintEl.textContent = 'Tip: Click any page below to toggle removal';
+        hintEl.classList.remove('hidden');
+      } else if (activePdfTool === 'split') {
+        hintEl.textContent = 'Tip: Click any page below to include/exclude from extraction';
+        hintEl.classList.remove('hidden');
+      } else if (activePdfTool === 'rotate') {
+        hintEl.textContent = `Live preview: rotating ${rotPages.size ? 'selected pages' : 'all pages'} by ${rotAngle}° clockwise`;
+        hintEl.classList.remove('hidden');
+      }
+
+      // For Sign PDF on last page when total > 12, make sure the last page is visible!
+      let displayPages = pages;
+      if (activePdfTool === 'sign' && signPageSpec === 'last' && total > pages.length && window.pdfjsLib) {
+        try {
+          const buf = await firstFile.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+          const lp = await pdf.getPage(total);
+          const vp = lp.getViewport({ scale: 0.72 });
+          const cv = document.createElement('canvas');
+          cv.width = Math.max(1, Math.floor(vp.width)); cv.height = Math.max(1, Math.floor(vp.height));
+          await lp.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+          displayPages = [pages[0], { page: total, src: cv.toDataURL('image/jpeg', 0.82), w: vp.width, h: vp.height }];
+        } catch (_) {}
+      }
+
+      displayPages.forEach(pg => {
+        const pNum = pg.page;
+        const isRemoved = activePdfTool === 'remove-pages' && rmPages.has(pNum);
+        const isSplitPicked = activePdfTool === 'split' && (splitPages.size === 0 || splitPages.has(pNum));
+        const isRangePicked = highlightRange.size > 0 && highlightRange.has(pNum);
+        const isRotated = activePdfTool === 'rotate' && (rotPages.size === 0 || rotPages.has(pNum));
+        const isCropped = activePdfTool === 'crop' && (cropPages.size === 0 || cropPages.has(pNum));
+        const isSigned = activePdfTool === 'sign' && signDataUrl && (signPageSet === null || signPageSet.has(pNum));
+
+        let borderCls = 'border-[var(--border-hairline)]';
+        if (isRemoved) borderCls = 'border-[var(--crimson)] border-dashed opacity-55';
+        else if ((activePdfTool === 'split' && splitPages.size > 0 && isSplitPicked) || isRangePicked) borderCls = 'border-[var(--accent)] ring-2 ring-[var(--accent-soft)]';
+
+        const card = document.createElement('div');
+        card.className = `rounded-xl bg-[var(--bg-elevated)] border ${borderCls} p-2 flex flex-col gap-1.5 transition-all ${['remove-pages', 'split'].includes(activePdfTool) ? 'cursor-pointer hover:border-[var(--accent)]' : ''}`;
+
+        // Build real-time overlay HTML
+        let overlayHtml = '';
+
+        if (activePdfTool === 'watermark' && wmText) {
+          const topPct = wmPos === 'top' ? '15%' : wmPos === 'bottom' ? '85%' : '50%';
+          overlayHtml += `<div class="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center"><span style="position:absolute; top:${topPct}; left:50%; transform:translate(-50%,-50%) rotate(${-wmAngle}deg); opacity:${wmOpacity}; color:#593d29; font-weight:700; font-size:16px; white-space:nowrap; letter-spacing:0.06em;">${escapeHtml(wmText)}</span></div>`;
+        }
+
+        if (activePdfTool === 'page-numbers') {
+          const num = pnStart + pNum - 1;
+          const totalDisp = pnStart + total - 1;
+          const lbl = pnFmt === 'simple' ? `${num}` : pnFmt === 'slash' ? `${num} / ${totalDisp}` : `Page ${num} of ${totalDisp}`;
+          const posStyle = pnPos === 'bottom-left' ? 'bottom:6px; left:8px;'
+            : pnPos === 'bottom-right' ? 'bottom:6px; right:8px;'
+            : pnPos === 'top-right' ? 'top:6px; right:8px;'
+            : pnPos === 'top-center' ? 'top:6px; left:50%; transform:translateX(-50%);'
+            : 'bottom:6px; left:50%; transform:translateX(-50%);';
+          overlayHtml += `<span class="absolute pointer-events-none px-1.5 py-0.5 rounded bg-white/85 text-[#3b2c22] font-mono text-[9px] font-semibold" style="${posStyle}">${escapeHtml(lbl)}</span>`;
+        }
+
+        if (isCropped) {
+          const toPct = (v, dim) => {
+            if (cropUnit === 'pct') return Math.min(45, Math.max(0, v));
+            const ptVal = cropUnit === 'mm' ? v * (72 / 25.4) : v;
+            return Math.min(45, Math.max(0, (ptVal / Math.max(100, dim)) * 100));
+          };
+          const tP = toPct(cropTop, 842), bP = toPct(cropBottom, 842), lP = toPct(cropLeft, 595), rP = toPct(cropRight, 595);
+          overlayHtml += `
+            <div class="absolute inset-x-0 top-0 bg-black/40 pointer-events-none" style="height:${tP}%"></div>
+            <div class="absolute inset-x-0 bottom-0 bg-black/40 pointer-events-none" style="height:${bP}%"></div>
+            <div class="absolute inset-y-0 left-0 bg-black/40 pointer-events-none" style="width:${lP}%"></div>
+            <div class="absolute inset-y-0 right-0 bg-black/40 pointer-events-none" style="width:${rP}%"></div>`;
+        }
+
+        if (isSigned) {
+          const sStyle = signPos === 'bottom-left' ? 'bottom:6%; left:6%;'
+            : signPos === 'bottom-center' ? 'bottom:6%; left:50%; transform:translateX(-50%);'
+            : signPos === 'center' ? 'top:50%; left:50%; transform:translate(-50%,-50%);'
+            : signPos === 'top-right' ? 'top:6%; right:6%;'
+            : 'bottom:6%; right:6%;';
+          overlayHtml += `<img src="${signDataUrl}" alt="Signature preview" class="absolute pointer-events-none object-contain" style="${sStyle} width:${signWidth}%;" />`;
+        }
+
+        if (isRemoved) {
+          overlayHtml += `<span class="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-[var(--crimson)] text-white text-[9px] font-bold">Remove</span>`;
+        } else if (activePdfTool === 'split' && splitPages.size > 0 && isSplitPicked) {
+          overlayHtml += `<span class="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-[var(--accent)] text-[var(--accent-fg)] text-[9px] font-bold">Extract</span>`;
+        }
+
+        card.innerHTML = `
+          <div class="relative w-full aspect-[3/4] rounded-lg bg-white border border-black/10 overflow-hidden flex items-center justify-center">
+            <img src="${pg.src}" alt="Page ${pNum}" class="w-full h-full object-contain transition-transform duration-200" style="${isRotated ? `transform: rotate(${rotAngle}deg) scale(${rotAngle % 180 !== 0 ? 0.72 : 1});` : ''}" />
+            ${overlayHtml}
+          </div>
+          <div class="flex items-center justify-between text-[10px] font-mono px-0.5">
+            <span class="text-[var(--ink-primary)] font-semibold">Page ${pNum}</span>
+            ${isRotated ? `<span class="text-[var(--accent)]">${rotAngle}°</span>` : ''}
+          </div>`;
+
+        if (activePdfTool === 'remove-pages') {
+          card.addEventListener('click', () => togglePageInInput('pdf-remove-pages-input', pNum, total));
+        } else if (activePdfTool === 'split') {
+          card.addEventListener('click', () => togglePageInInput('pdf-split-pages', pNum, total));
+        }
+
+        grid.appendChild(card);
+      });
+
+      if (total > pages.length && activePdfTool !== 'sign') {
+        const more = document.createElement('div');
+        more.className = 'col-span-full text-center text-[11px] font-mono text-[var(--ink-muted)] py-1';
+        more.textContent = `+ ${total - pages.length} more pages will also be processed`;
+        grid.appendChild(more);
+      }
+      refreshIcons();
     }
 
     function selectPdfTool(toolId, openWorkspace = true) {
@@ -2440,6 +2897,8 @@
         : `Accepts ${meta.accept} (${meta.multiple ? 'multiple files' : 'single file'})`;
       pdfToolInput.accept = meta.accept;
       pdfToolInput.multiple = meta.multiple;
+      const addMoreSpan = document.querySelector('#pdf-add-more-btn span');
+      if (addMoreSpan) addMoreSpan.textContent = meta.multiple ? 'Add Files' : 'Change File';
       pdfResultInfo.textContent = 'Ready to process';
 
       const optionIds = [
@@ -2519,6 +2978,7 @@
         });
         pdfFileList.appendChild(row);
       });
+      renderPdfLivePreview();
     }
 
     async function runActivePdfTool() {
@@ -2817,6 +3277,9 @@
     function openFeatureSearch() {
       const modal = document.getElementById('feature-search-modal');
       const input = document.getElementById('feature-search-input');
+      document.querySelectorAll('.t-expanding-tab[data-view]').forEach(btn => btn.setAttribute('aria-selected', 'false'));
+      const searchBtn = document.getElementById('open-search-btn');
+      if (searchBtn) searchBtn.setAttribute('aria-selected', 'true');
       modal.classList.remove('hidden');
       input.value = '';
       searchActiveIdx = 0;
@@ -2826,6 +3289,11 @@
 
     function closeFeatureSearch() {
       document.getElementById('feature-search-modal').classList.add('hidden');
+      const searchBtn = document.getElementById('open-search-btn');
+      if (searchBtn) searchBtn.setAttribute('aria-selected', 'false');
+      document.querySelectorAll('.t-expanding-tab[data-view]').forEach(btn => {
+        btn.setAttribute('aria-selected', String(btn.getAttribute('data-view') === activeMainView));
+      });
     }
 
     function renderFeatureSearchResults(query) {
@@ -3075,8 +3543,22 @@
       document.getElementById('pdf-back-directory-btn').addEventListener('click', showPdfDirectory);
       pdfDropZone.addEventListener('click', () => pdfToolInput.click());
       pdfDropZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pdfToolInput.click(); } });
+      document.getElementById('pdf-add-more-btn').addEventListener('click', () => pdfToolInput.click());
       pdfToolInput.addEventListener('change', e => { addFilesToPdfTool(e.target.files); pdfToolInput.value = ''; });
       document.getElementById('pdf-clear-files-btn').addEventListener('click', () => { pdfSelectedFiles = []; renderPdfFileList(); });
+
+      // Live real-time preview refresh whenever any option input/select changes inside PDF workspace
+      const pdfOptionsCard = document.getElementById('pdf-options-card');
+      pdfOptionsCard.addEventListener('input', (e) => {
+        if (e.target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName) && e.target.id !== 'pdf-tool-input') {
+          renderPdfLivePreview();
+        }
+      });
+      pdfOptionsCard.addEventListener('change', (e) => {
+        if (e.target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName) && e.target.id !== 'pdf-tool-input') {
+          renderPdfLivePreview();
+        }
+      });
       document.getElementById('pdf-run-btn').addEventListener('click', runActivePdfTool);
       document.getElementById('pdf-cancel-btn').addEventListener('click', cancelActiveProcess);
       document.getElementById('settings-cancel-btn').addEventListener('click', cancelActiveProcess);
