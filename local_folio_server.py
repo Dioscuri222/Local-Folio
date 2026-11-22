@@ -371,7 +371,7 @@ async def ocr_extract(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Tab 3: Local PDF Toolkit (iLovePDF Lokal)
+# Tab 3: Local PDF Toolkit (Local iLovePDF)
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.post("/api/pdf/merge")
