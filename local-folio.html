@@ -829,6 +829,15 @@
           </div>
         </div>
 
+        <!-- OCR PDF Options -->
+        <div id="pdf-options-ocr-pdf" class="hidden">
+          <label for="pdf-ocr-mode" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">OCR Mode</label>
+          <select id="pdf-ocr-mode" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+            <option value="smart">Smart Hybrid — Instant text + RapidOCR for scanned pages (Fastest)</option>
+            <option value="force">Force RapidOCR on All Pages — Reads text inside charts/images (Slower)</option>
+          </select>
+        </div>
+
         <!-- Password Options (Protect / Unlock) -->
         <div id="pdf-options-password" class="hidden">
           <label for="pdf-password-input" id="pdf-password-label" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">PDF Password</label>
@@ -837,10 +846,16 @@
 
         <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[var(--border-hairline)]">
           <span id="pdf-result-info" class="text-xs font-mono text-[var(--ink-muted)]">Ready to process</span>
-          <button id="pdf-run-btn" type="button" class="inline-flex items-center justify-center gap-2 min-h-[44px] px-6 text-xs font-semibold rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-fg)] disabled:opacity-45 transition-colors">
-            <i data-lucide="play" class="w-4 h-4"></i>
-            <span id="pdf-run-label">Merge PDF</span>
-          </button>
+          <div class="flex items-center gap-2">
+            <button id="pdf-cancel-btn" type="button" class="hidden inline-flex items-center justify-center gap-1.5 min-h-[44px] px-4 text-xs font-semibold rounded-xl bg-[var(--crimson-soft)] border border-[var(--crimson)] text-[var(--crimson)] hover:opacity-90 transition-opacity">
+              <i data-lucide="square" class="w-3.5 h-3.5"></i>
+              <span>Cancel</span>
+            </button>
+            <button id="pdf-run-btn" type="button" class="inline-flex items-center justify-center gap-2 min-h-[44px] px-6 text-xs font-semibold rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-fg)] disabled:opacity-45 transition-colors">
+              <i data-lucide="play" class="w-4 h-4"></i>
+              <span id="pdf-run-label">Merge PDF</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -880,7 +895,10 @@
 
             <div class="flex items-center justify-between gap-2 text-[11px]">
               <span id="settings-progress-detail" class="text-[var(--ink-muted)] truncate">No active processes running</span>
-              <span id="settings-progress-counts" class="font-mono text-[var(--ink-secondary)] shrink-0">0/0</span>
+              <div class="flex items-center gap-2 shrink-0">
+                <span id="settings-progress-counts" class="font-mono text-[var(--ink-secondary)]">0/0</span>
+                <button id="settings-cancel-btn" type="button" class="hidden px-2.5 py-1 rounded-lg bg-[var(--crimson-soft)] border border-[var(--crimson)] text-[var(--crimson)] font-semibold hover:opacity-90 transition-opacity">Cancel</button>
+              </div>
             </div>
           </div>
 
@@ -1047,6 +1065,51 @@
     let progressTimerId = null;
     let progressStartedAt = null;
     let pdfIsRunning = false;
+    let activeJobId = null;
+    let activeJobPollId = null;
+    let activeAbortController = null;
+    let activeCancelHandler = null;
+
+    function generateJobId() {
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+      return 'job-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+    }
+
+    function stopJobProgressPolling() {
+      if (activeJobPollId) {
+        clearInterval(activeJobPollId);
+        activeJobPollId = null;
+      }
+    }
+
+    function startJobProgressPolling(jobId, onProgress) {
+      stopJobProgressPolling();
+      activeJobId = jobId;
+      activeJobPollId = setInterval(async () => {
+        if (!activeJobId || activeJobId !== jobId) return;
+        try {
+          const res = await fetch(`${API_BASE}/api/jobs/${encodeURIComponent(jobId)}`);
+          if (!res.ok) return;
+          const data = await res.json();
+          if (data && data.status !== 'unknown') {
+            onProgress(data);
+          }
+        } catch (_) {}
+      }, 450);
+    }
+
+    async function cancelActiveProcess() {
+      const jobToCancel = activeJobId;
+      if (activeCancelHandler) {
+        activeCancelHandler();
+      }
+      if (jobToCancel && backendAvailable) {
+        fetch(`${API_BASE}/api/jobs/${encodeURIComponent(jobToCancel)}/cancel`, { method: 'POST' }).catch(() => {});
+      }
+      if (activeAbortController) {
+        try { activeAbortController.abort(); } catch (_) {}
+      }
+    }
 
     function formatElapsed(ms) {
       const totalSec = Math.max(0, Math.floor(ms / 1000));
@@ -1064,6 +1127,7 @@
       const bar = document.getElementById('settings-progress-bar');
       const elapsedEl = document.getElementById('settings-progress-elapsed');
       const headerDot = document.getElementById('settings-running-dot');
+      const cancelBtn = document.getElementById('settings-cancel-btn');
 
       if (!bar) return;
 
@@ -1083,6 +1147,7 @@
             : 'w-2.5 h-2.5 rounded-full bg-[var(--border-strong)] shrink-0';
       }
       if (headerDot) headerDot.classList.toggle('hidden', !active);
+      if (cancelBtn) cancelBtn.classList.toggle('hidden', !active);
 
       if (active) {
         if (!progressStartedAt) progressStartedAt = Date.now();
@@ -1216,19 +1281,20 @@
       return { markdown, method: ocrUsed ? 'PDF OCR (Browser)' : 'PDF Text' };
     }
 
-    async function convertFileToMarkdown(item) {
+    async function convertFileToMarkdown(item, { signal, jobId } = {}) {
       if (backendAvailable) {
         const fd = new FormData();
         if (item.url) fd.append('url', item.url);
         else fd.append('file', item.file);
         fd.append('enable_frontmatter', String(settings.enableFrontmatter));
         fd.append('enable_ocr', String(settings.enablePdfOcr));
+        if (jobId && !item.url) fd.append('job_id', jobId);
         if (settings.llmBaseUrl) fd.append('llm_base_url', settings.llmBaseUrl);
         if (settings.llmModel) fd.append('llm_model', settings.llmModel);
         if (settings.llmApiKey) fd.append('llm_api_key', settings.llmApiKey);
 
         const endpoint = item.url ? `${API_BASE}/api/convert-url` : `${API_BASE}/api/convert`;
-        const res = await fetch(endpoint, { method: 'POST', body: fd });
+        const res = await fetch(endpoint, { method: 'POST', body: fd, signal });
         const data = await res.json();
         if (!res.ok || data.error) throw new Error(data.error || `Server error (${res.status})`);
         item.method = data.method || 'Microsoft MarkItDown';
@@ -1293,17 +1359,24 @@
       processQueue();
     }
 
+    let cancelQueueRequested = false;
+
     async function processQueue() {
       if (isProcessing) return;
       isProcessing = true;
+      cancelQueueRequested = false;
+      activeCancelHandler = () => { cancelQueueRequested = true; };
       try {
         while (true) {
+          if (cancelQueueRequested) break;
           const item = fileQueue.find(i => i.status === 'pending');
           if (!item) break;
           batchSpinner.classList.remove('hidden');
           item.status = 'converting';
           updateUI();
           const doneNow = fileQueue.filter(i => i.status === 'done' || i.status === 'error').length;
+          const jobId = generateJobId();
+          activeAbortController = new AbortController();
           updateSettingsProgress({
             active: true,
             title: 'Running: MarkItDown',
@@ -1311,19 +1384,53 @@
             pct: Math.max(8, (doneNow / fileQueue.length) * 100),
             counts: `${doneNow}/${fileQueue.length}`
           });
+          if (backendAvailable && !item.url && item.file.name.toLowerCase().endsWith('.pdf')) {
+            startJobProgressPolling(jobId, (p) => {
+              if (p.total > 0) {
+                updateSettingsProgress({
+                  active: true,
+                  title: 'Running: MarkItDown (PDF OCR)',
+                  detail: p.detail || `Processing ${item.file.name}`,
+                  pct: p.pct,
+                  counts: `${p.current}/${p.total} pages`
+                });
+              }
+            });
+          }
           try {
-            item.markdown = await convertFileToMarkdown(item);
+            item.markdown = await convertFileToMarkdown(item, { signal: activeAbortController.signal, jobId });
             item.status = 'done';
           } catch (err) {
+            if (err.name === 'AbortError' || cancelQueueRequested) {
+              item.status = 'error';
+              item.errorMsg = 'Cancelled by user';
+              break;
+            }
             item.status = 'error';
             item.errorMsg = err.message || 'Conversion failed';
+          } finally {
+            stopJobProgressPolling();
+            activeJobId = null;
+            activeAbortController = null;
           }
           updateUI();
         }
       } finally {
         isProcessing = false;
+        activeCancelHandler = null;
         batchSpinner.classList.add('hidden');
-        if (fileQueue.length > 0) {
+        if (cancelQueueRequested) {
+          fileQueue.forEach(i => { if (i.status === 'pending') { i.status = 'error'; i.errorMsg = 'Cancelled by user'; } });
+          updateUI();
+          updateSettingsProgress({
+            active: false,
+            title: 'Cancelled: MarkItDown',
+            detail: 'Conversion queue stopped by user',
+            pct: 0,
+            counts: `${fileQueue.filter(i => i.status === 'done').length}/${fileQueue.length}`
+          });
+          showToast('MarkItDown queue cancelled', 'warning');
+        } else if (fileQueue.length > 0) {
           const doneAll = fileQueue.filter(i => i.status === 'done').length;
           updateSettingsProgress({
             active: false,
@@ -1477,12 +1584,17 @@
       processOcrQueue();
     }
 
+    let cancelOcrRequested = false;
+
     async function processOcrQueue() {
       if (isOcrProcessing) return;
       isOcrProcessing = true;
+      cancelOcrRequested = false;
+      activeCancelHandler = () => { cancelOcrRequested = true; };
 
       try {
         while (true) {
+          if (cancelOcrRequested) break;
           const item = ocrQueue.find(i => i.status === 'pending');
           if (!item) break;
 
@@ -1491,6 +1603,8 @@
           item.errorMsg = '';
           updateOcrUI();
           const doneNow = ocrQueue.filter(i => i.status === 'done' || i.status === 'error').length;
+          const jobId = generateJobId();
+          activeAbortController = new AbortController();
           updateSettingsProgress({
             active: true,
             title: 'Running: Batch OCR (RapidOCR)',
@@ -1499,11 +1613,26 @@
             counts: `${doneNow}/${ocrQueue.length}`
           });
 
+          if (item.file.name.toLowerCase().endsWith('.pdf')) {
+            startJobProgressPolling(jobId, (p) => {
+              if (p.total > 0) {
+                updateSettingsProgress({
+                  active: true,
+                  title: 'Running: Batch OCR (PDF)',
+                  detail: p.detail || `Extracting text from ${item.file.name}`,
+                  pct: p.pct,
+                  counts: `${p.current}/${p.total} pages`
+                });
+              }
+            });
+          }
+
           try {
             const fd = new FormData();
             fd.append('file', item.file);
             fd.append('rotate', ocrRotateSelect.value);
-            const res = await fetch(`${API_BASE}/api/ocr`, { method: 'POST', body: fd });
+            fd.append('job_id', jobId);
+            const res = await fetch(`${API_BASE}/api/ocr`, { method: 'POST', body: fd, signal: activeAbortController.signal });
             const data = await res.json();
             if (!res.ok || data.error) throw new Error(data.error || `OCR failed (${res.status})`);
 
@@ -1513,27 +1642,50 @@
             item.rotation = data.rotation_applied || 0;
             item.status = 'done';
           } catch (err) {
+            if (err.name === 'AbortError' || cancelOcrRequested) {
+              item.status = 'error';
+              item.errorMsg = 'Cancelled by user';
+              break;
+            }
             item.status = 'error';
             item.errorMsg = err.message || 'OCR failed';
+          } finally {
+            stopJobProgressPolling();
+            activeJobId = null;
+            activeAbortController = null;
           }
 
           updateOcrUI();
         }
       } finally {
         isOcrProcessing = false;
+        activeCancelHandler = null;
         ocrBatchSpinner.classList.add('hidden');
         const doneCount = ocrQueue.filter(i => i.status === 'done').length;
-        if (ocrQueue.length > 0) {
+        if (cancelOcrRequested) {
+          ocrQueue.forEach(i => { if (i.status === 'pending') { i.status = 'error'; i.errorMsg = 'Cancelled by user'; } });
+          updateOcrUI();
           updateSettingsProgress({
             active: false,
-            title: 'Completed: Batch OCR',
-            detail: `${doneCount} of ${ocrQueue.length} images processed`,
-            pct: 100,
+            title: 'Cancelled: Batch OCR',
+            detail: 'OCR queue stopped by user',
+            pct: 0,
             counts: `${doneCount}/${ocrQueue.length}`
           });
-        }
-        if (doneCount > 0) {
-          showToast(`Batch OCR complete (${doneCount}/${ocrQueue.length} files)`, 'success');
+          showToast('Batch OCR cancelled', 'warning');
+        } else {
+          if (ocrQueue.length > 0) {
+            updateSettingsProgress({
+              active: false,
+              title: 'Completed: Batch OCR',
+              detail: `${doneCount} of ${ocrQueue.length} images processed`,
+              pct: 100,
+              counts: `${doneCount}/${ocrQueue.length}`
+            });
+          }
+          if (doneCount > 0) {
+            showToast(`Batch OCR complete (${doneCount}/${ocrQueue.length} files)`, 'success');
+          }
         }
       }
     }
@@ -1716,6 +1868,7 @@
       document.getElementById('pdf-options-remove-pages').classList.toggle('hidden', toolId !== 'remove-pages');
       document.getElementById('pdf-options-rotate').classList.toggle('hidden', toolId !== 'rotate');
       document.getElementById('pdf-options-to-images').classList.toggle('hidden', toolId !== 'to-images');
+      document.getElementById('pdf-options-ocr-pdf').classList.toggle('hidden', toolId !== 'ocr-pdf');
       const needsPassword = toolId === 'protect' || toolId === 'unlock';
       document.getElementById('pdf-options-password').classList.toggle('hidden', !needsPassword);
       if (needsPassword) {
@@ -1764,9 +1917,17 @@
       if (activePdfTool === 'merge' && pdfSelectedFiles.length < 2) { showToast('Select at least 2 PDF files to merge', 'warning'); return; }
 
       const runBtn = document.getElementById('pdf-run-btn');
+      const cancelBtn = document.getElementById('pdf-cancel-btn');
+      const jobId = generateJobId();
+      let cancelledByUser = false;
+
       runBtn.disabled = true;
+      cancelBtn.classList.remove('hidden');
       pdfIsRunning = true;
-      pdfResultInfo.textContent = 'Processing locally...';
+      activeAbortController = new AbortController();
+      activeCancelHandler = () => { cancelledByUser = true; };
+
+      pdfResultInfo.textContent = 'Starting local process...';
       updateSettingsProgress({
         active: true,
         title: `Running: ${PDF_TOOLS_META[activePdfTool].title}`,
@@ -1776,12 +1937,36 @@
         indeterminate: true
       });
 
+      const supportsLivePages = ['ocr-pdf', 'to-images', 'compress', 'to-markdown'].includes(activePdfTool);
+      if (supportsLivePages) {
+        startJobProgressPolling(jobId, (p) => {
+          if (p.total > 0) {
+            const label = p.detail || `Page ${p.current} of ${p.total}`;
+            pdfResultInfo.textContent = `${label} (${p.pct}%)`;
+            updateSettingsProgress({
+              active: true,
+              title: `Running: ${PDF_TOOLS_META[activePdfTool].title}`,
+              detail: label,
+              pct: p.pct,
+              counts: `${p.current}/${p.total} pages`,
+              indeterminate: false
+            });
+          } else if (p.detail) {
+            pdfResultInfo.textContent = p.detail;
+          }
+        });
+      }
+
       try {
         const fd = new FormData();
         if (activePdfTool === 'merge' || activePdfTool === 'from-images') {
           pdfSelectedFiles.forEach(f => fd.append('files', f));
         } else {
           fd.append('file', pdfSelectedFiles[0]);
+        }
+
+        if (supportsLivePages) {
+          fd.append('job_id', jobId);
         }
 
         if (activePdfTool === 'split') {
@@ -1797,11 +1982,17 @@
         } else if (activePdfTool === 'to-images') {
           fd.append('img_format', document.getElementById('pdf-img-format').value);
           fd.append('dpi', document.getElementById('pdf-img-dpi').value);
+        } else if (activePdfTool === 'ocr-pdf') {
+          fd.append('ocr_mode', document.getElementById('pdf-ocr-mode').value);
         } else if (activePdfTool === 'protect' || activePdfTool === 'unlock') {
           fd.append('password', document.getElementById('pdf-password-input').value);
         }
 
-        const res = await fetch(`${API_BASE}/api/pdf/${activePdfTool}`, { method: 'POST', body: fd });
+        const res = await fetch(`${API_BASE}/api/pdf/${activePdfTool}`, {
+          method: 'POST',
+          body: fd,
+          signal: activeAbortController.signal
+        });
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
           throw new Error(errData.detail || errData.error || `Failed (${res.status})`);
@@ -1819,9 +2010,15 @@
 
         const orig = Number(res.headers.get('X-Original-Size') || 0);
         const comp = Number(res.headers.get('X-Compressed-Size') || 0);
+        const pageCount = Number(res.headers.get('X-Page-Count') || 0);
+        const ocrPages = res.headers.get('X-OCR-Pages');
+        const digitalPages = res.headers.get('X-Digital-Pages');
+
         if (orig && comp) {
           const saved = Math.max(0, Math.round((1 - comp / orig) * 100));
           pdfResultInfo.textContent = `Downloaded ${filename} (${formatBytes(orig)} -> ${formatBytes(comp)}, -${saved}%)`;
+        } else if (ocrPages !== null && digitalPages !== null && pageCount) {
+          pdfResultInfo.textContent = `Downloaded ${filename} (${pageCount} pages: ${digitalPages} digital, ${ocrPages} OCR)`;
         } else {
           pdfResultInfo.textContent = `Downloaded ${filename} (${formatBytes(blob.size)})`;
         }
@@ -1831,21 +2028,38 @@
           title: `Completed: ${PDF_TOOLS_META[activePdfTool].title}`,
           detail: `Downloaded ${filename}`,
           pct: 100,
-          counts: `${pdfSelectedFiles.length}/${pdfSelectedFiles.length}`
+          counts: pageCount ? `${pageCount}/${pageCount} pages` : `${pdfSelectedFiles.length}/${pdfSelectedFiles.length}`
         });
       } catch (err) {
-        pdfResultInfo.textContent = `Error: ${err.message}`;
-        showToast(err.message, 'error');
-        updateSettingsProgress({
-          active: false,
-          title: `Failed: ${PDF_TOOLS_META[activePdfTool].title}`,
-          detail: err.message || 'Processing failed',
-          pct: 0,
-          counts: `0/${pdfSelectedFiles.length}`
-        });
+        if (err.name === 'AbortError' || cancelledByUser) {
+          pdfResultInfo.textContent = 'Cancelled by user';
+          showToast(`${PDF_TOOLS_META[activePdfTool].title} cancelled`, 'warning');
+          updateSettingsProgress({
+            active: false,
+            title: `Cancelled: ${PDF_TOOLS_META[activePdfTool].title}`,
+            detail: 'Stopped by user',
+            pct: 0,
+            counts: '0/0'
+          });
+        } else {
+          pdfResultInfo.textContent = `Error: ${err.message}`;
+          showToast(err.message, 'error');
+          updateSettingsProgress({
+            active: false,
+            title: `Failed: ${PDF_TOOLS_META[activePdfTool].title}`,
+            detail: err.message || 'Processing failed',
+            pct: 0,
+            counts: `0/${pdfSelectedFiles.length}`
+          });
+        }
       } finally {
+        stopJobProgressPolling();
+        activeJobId = null;
+        activeAbortController = null;
+        activeCancelHandler = null;
         pdfIsRunning = false;
         runBtn.disabled = false;
+        cancelBtn.classList.add('hidden');
       }
     }
 
@@ -2010,6 +2224,8 @@
       pdfToolInput.addEventListener('change', e => { addFilesToPdfTool(e.target.files); pdfToolInput.value = ''; });
       document.getElementById('pdf-clear-files-btn').addEventListener('click', () => { pdfSelectedFiles = []; renderPdfFileList(); });
       document.getElementById('pdf-run-btn').addEventListener('click', runActivePdfTool);
+      document.getElementById('pdf-cancel-btn').addEventListener('click', cancelActiveProcess);
+      document.getElementById('settings-cancel-btn').addEventListener('click', cancelActiveProcess);
 
       // Header utilities
       document.getElementById('theme-toggle-btn').addEventListener('click', () => applyTheme(document.documentElement.classList.contains('dark') ? 'light' : 'dark'));
