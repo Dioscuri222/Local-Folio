@@ -1,4 +1,4 @@
-# Folio-Local
+# Local-Folio
 
 **Folio-Local** is a 100% local, privacy-first web suite for **document-to-Markdown conversion**, **offline OCR (including rotated photos & scanned PDFs)**, and **iLovePDF-style PDF tools** — with zero file-count limits and zero cloud uploads.
 
