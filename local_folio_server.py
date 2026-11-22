@@ -13,7 +13,7 @@ import numpy as np
 import pypdfium2 as pdfium
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from markitdown import MarkItDown
 from PIL import Image, ImageOps
 from pypdf import PdfReader, PdfWriter
@@ -292,11 +292,27 @@ def parse_page_ranges(range_str: str, total_pages: int) -> List[int]:
 # Core Routes
 # ─────────────────────────────────────────────────────────────────────────────
 
+FAVICON_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+    '<rect x="2" y="2" width="60" height="60" rx="16" fill="#efe6da" stroke="#e2d5c3" stroke-width="3"/>'
+    '<g transform="translate(14 14) scale(1.5)" fill="none" stroke="#8f4f24" '
+    'stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">'
+    '<path d="M10 2v2"/><path d="M14 2v2"/>'
+    '<path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/>'
+    '<path d="M6 2v2"/></g></svg>'
+)
+
+
 @app.get("/")
 async def serve_frontend():
     if not HTML_PATH.exists():
         raise HTTPException(status_code=404, detail="local-folio.html not found")
     return FileResponse(HTML_PATH)
+
+
+@app.get("/favicon.ico")
+async def serve_favicon():
+    return Response(content=FAVICON_SVG, media_type="image/svg+xml")
 
 
 @app.get("/api/health")
