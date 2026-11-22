@@ -19,7 +19,7 @@ from rapidocr_onnxruntime import RapidOCR
 APP_DIR = Path(__file__).resolve().parent
 HTML_PATH = APP_DIR / "Markitdown_Lokal.html"
 
-app = FastAPI(title="Folio-Local — Local PDF, OCR & Markdown Suite")
+app = FastAPI(title="Local-Folio — Local PDF, OCR & Markdown Suite")
 
 app.add_middleware(
     CORSMiddleware,
@@ -207,7 +207,7 @@ async def serve_frontend():
 async def health_check():
     return {
         "status": "ok",
-        "engine": "folio-local",
+        "engine": "local-folio",
         "features": ["microsoft-markitdown", "rapidocr-onnx", "pdf-tools"],
     }
 
@@ -746,5 +746,5 @@ if __name__ == "__main__":
     import uvicorn
 
     port = int(os.environ.get("PORT", "8765"))
-    print(f"Folio-Local running at http://127.0.0.1:{port}")
+    print(f"Local-Folio running at http://127.0.0.1:{port}")
     uvicorn.run(app, host="127.0.0.1", port=port)

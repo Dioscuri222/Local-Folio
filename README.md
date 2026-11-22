@@ -1,22 +1,22 @@
 # Local-Folio
 
-**Folio-Local** is a 100% local, privacy-first web suite for **document-to-Markdown conversion**, **offline OCR (including rotated photos & scanned PDFs)**, and **iLovePDF-style PDF tools** — with zero file-count limits and zero cloud uploads.
+**Local-Folio** is a 100% local, privacy-first web suite for **document-to-Markdown conversion**, **offline batch OCR (including rotated photos & scanned PDFs)**, and **iLovePDF-style PDF tools** — with zero file-count limits and zero cloud uploads.
 
 ## Problem & Solution
 
 - **Problem:** Most online PDF and OCR tools cap batch uploads (often 2–3 files), require uploading sensitive documents to third-party servers, and fail on scanned PDFs or rotated phone photos of screens and documents.
-- **Solution:** Folio-Local runs completely on your own machine (`http://127.0.0.1:8765`) by combining three local workflows in one interface:
+- **Solution:** Local-Folio runs completely on your own machine (`http://127.0.0.1:8765`) by combining three local workflows in one interface:
   1. **MarkItDown Converter** — Unlimited batch conversion for PDF, DOCX, PPTX, XLSX/CSV, HTML, EPUB, ZIP, Audio, and Web/YouTube URLs, with automatic local OCR fallback for scanned PDFs.
-  2. **Local Image & PDF OCR** — Offline text extraction from `.jpg`, `.jpeg`, `.png`, `.webp`, `.bmp`, and scanned `.pdf` using RapidOCR (ONNX) with smart auto-orientation (`0° / 90° / 180° / 270°`).
-  3. **Local PDF Toolkit** — Merge PDF, Split / Extract Pages, Rotate PDF, Compress PDF, PDF to JPG/PNG (`.zip`), and JPG/PNG to PDF.
+  2. **Local Batch Image & PDF OCR** — Offline batch text extraction from `.jpg`, `.jpeg`, `.png`, `.webp`, `.bmp`, and scanned `.pdf` using RapidOCR (ONNX) with smart auto-orientation (`0° / 90° / 180° / 270°`), combined view, and `.ZIP` export.
+  3. **Local PDF Toolkit** — iLovePDF-style directory with Merge PDF, Split PDF, Remove Pages, Rotate PDF, Compress PDF, OCR PDF, PDF to JPG/PNG, JPG/PNG to PDF, PDF to Markdown, Protect PDF, and Unlock PDF.
 
 ## Installation
 
 Make sure you have **Python 3.10+** installed, then clone this repository and install dependencies from PyPI:
 
 ```bash
-git clone https://github.com/Dioscuri222/Folio-Local.git
-cd Folio-Local
+git clone https://github.com/Dioscuri222/Local-Folio.git
+cd Local-Folio
 
 # (Optional) Create and activate a virtual environment
 python -m venv .venv
