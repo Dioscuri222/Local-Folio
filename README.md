@@ -10,6 +10,8 @@
   2. **Local Batch Image & PDF OCR** - Offline batch text extraction from `.jpg`, `.jpeg`, `.png`, `.webp`, `.bmp`, and scanned `.pdf` using RapidOCR (ONNX) with smart auto-orientation (`0° / 90° / 180° / 270°`), combined view, and `.ZIP` export.
   3. **Local PDF Toolkit** - iLovePDF-style directory with Merge PDF, Split PDF, Remove Pages, Rotate PDF, Compress PDF, OCR PDF, PDF to JPG/PNG, JPG/PNG to PDF, PDF to Markdown, Protect PDF, and Unlock PDF.
 
+<img width="1919" height="944" alt="image" src="https://github.com/user-attachments/assets/0db68bab-8c85-4a20-b140-931498d58976" />
+
 ## Installation
 
 Make sure you have **Python 3.10+** installed, then clone this repository and install dependencies from PyPI:
