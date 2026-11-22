@@ -591,6 +591,157 @@ async def pdf_from_images(files: List[UploadFile] = File(...)):
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@app.post("/api/pdf/remove-pages")
+async def pdf_remove_pages(
+    file: UploadFile = File(...),
+    pages: str = Form(...),
+):
+    raw = await file.read()
+    stem = Path(file.filename or "document").stem
+    try:
+        reader = PdfReader(io.BytesIO(raw))
+        total = len(reader.pages)
+        remove_set = set(parse_page_ranges(pages, total))
+        if not remove_set:
+            raise HTTPException(status_code=400, detail=f"Specify pages to remove (1-{total}).")
+        kept = [reader.pages[i] for i in range(total) if i not in remove_set]
+        if not kept:
+            raise HTTPException(status_code=400, detail="Cannot remove all pages from a PDF.")
+        writer = PdfWriter()
+        for page in kept:
+            writer.add_page(page)
+        out = io.BytesIO()
+        writer.write(out)
+        out.seek(0)
+        return StreamingResponse(
+            out,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{stem}_trimmed.pdf"',
+                "X-Page-Count": str(len(kept)),
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/pdf/protect")
+async def pdf_protect(
+    file: UploadFile = File(...),
+    password: str = Form(...),
+):
+    if not password.strip():
+        raise HTTPException(status_code=400, detail="Password cannot be empty.")
+    raw = await file.read()
+    stem = Path(file.filename or "document").stem
+    try:
+        reader = PdfReader(io.BytesIO(raw))
+        writer = PdfWriter()
+        for page in reader.pages:
+            writer.add_page(page)
+        writer.encrypt(password)
+        out = io.BytesIO()
+        writer.write(out)
+        out.seek(0)
+        return StreamingResponse(
+            out,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{stem}_protected.pdf"',
+                "X-Page-Count": str(len(writer.pages)),
+            },
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/pdf/unlock")
+async def pdf_unlock(
+    file: UploadFile = File(...),
+    password: str = Form(""),
+):
+    raw = await file.read()
+    stem = Path(file.filename or "document").stem
+    try:
+        reader = PdfReader(io.BytesIO(raw))
+        if reader.is_encrypted:
+            res = reader.decrypt(password)
+            if res == 0:
+                raise HTTPException(status_code=400, detail="Incorrect password for this encrypted PDF.")
+        writer = PdfWriter()
+        for page in reader.pages:
+            writer.add_page(page)
+        out = io.BytesIO()
+        writer.write(out)
+        out.seek(0)
+        return StreamingResponse(
+            out,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{stem}_unlocked.pdf"',
+                "X-Page-Count": str(len(writer.pages)),
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/pdf/to-markdown")
+async def pdf_to_markdown(file: UploadFile = File(...)):
+    raw = await file.read()
+    stem = Path(file.filename or "document").stem
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir) / "input.pdf"
+        tmp_path.write_bytes(raw)
+        try:
+            md_engine = MarkItDown()
+            result = md_engine.convert(str(tmp_path))
+            text = (result.text_content or "").strip()
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    if not text:
+        pages = render_pdf_pages_pil(raw, scale=2.0)
+        sections = []
+        for idx, page_img in enumerate(pages, start=1):
+            p_txt, _, _, _ = run_rapidocr_on_image(page_img, rotate_mode="auto")
+            sections.append(f"## Page {idx}\n\n{p_txt}" if len(pages) > 1 else p_txt)
+        text = f"# {stem}\n\n" + "\n\n".join(sections)
+
+    return StreamingResponse(
+        io.BytesIO(text.encode("utf-8")),
+        media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{stem}.md"'},
+    )
+
+
+@app.post("/api/pdf/ocr-pdf")
+async def pdf_ocr_download(file: UploadFile = File(...)):
+    raw = await file.read()
+    stem = Path(file.filename or "document").stem
+    try:
+        pages = render_pdf_pages_pil(raw, scale=2.0)
+        parts: List[str] = []
+        for idx, page_img in enumerate(pages, start=1):
+            txt, _, _, _ = run_rapidocr_on_image(page_img, rotate_mode="auto")
+            parts.append(f"--- Page {idx} ---\n{txt}" if len(pages) > 1 else txt)
+        out_text = "\n\n".join(parts).strip()
+        return StreamingResponse(
+            io.BytesIO(out_text.encode("utf-8")),
+            media_type="text/plain; charset=utf-8",
+            headers={
+                "Content-Disposition": f'attachment; filename="{stem}_ocr.txt"',
+                "X-Page-Count": str(len(pages)),
+            },
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 if __name__ == "__main__":
     import uvicorn
 
