@@ -12,5 +12,14 @@ rapidocr-onnxruntime>=1.4.0
 # Local PDF Toolkit & Image Processing
 pypdf>=5.0.0
 pypdfium2>=4.30.0
+PyMuPDF>=1.24.0
+pikepdf>=9.0.0
 Pillow>=10.0.0
 numpy>=1.26.0
+
+# Office & Document Conversion (PDF <-> Word / Excel / PowerPoint)
+pdf2docx>=0.5.8
+pdfplumber>=0.11.0
+openpyxl>=3.1.0
+python-pptx>=1.0.0
+pywin32>=306; sys_platform == "win32"
