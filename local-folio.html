@@ -337,6 +337,11 @@
           <i data-lucide="layers" class="w-[18px] h-[18px] shrink-0" aria-hidden="true"></i>
           <span class="t-expanding-label-wrap"><span class="t-expanding-label">PDF Tools</span></span>
         </button>
+
+        <span class="w-px h-5 bg-[var(--border-strong)]/60 mx-0.5 shrink-0" aria-hidden="true"></span>
+        <button id="open-search-btn" type="button" class="t-expanding-tab" title="Search tools &amp; features (Ctrl+K)" aria-label="Search features">
+          <i data-lucide="search" class="w-[18px] h-[18px] shrink-0" aria-hidden="true"></i>
+        </button>
       </nav>
 
       <!-- Utility Actions (Flush Right) -->
@@ -620,131 +625,23 @@
           Every tool you need to work with PDFs in one place
         </h2>
         <p class="text-sm sm:text-base text-[var(--ink-secondary)] leading-relaxed max-w-2xl mx-auto">
-          Merge, split, remove pages, compress, rotate, protect, unlock, OCR, and convert PDFs locally on your device with no file limits.
+          29 local tools to organize, optimize, convert, edit, sign, redact, compare, summarize, and automate PDF workflows privately on your device.
         </p>
       </div>
 
       <!-- Category Filter Pills (iLovePDF pattern) -->
       <div id="pdf-category-bar" role="tablist" aria-label="Filter PDF tool categories" class="flex flex-wrap items-center justify-center gap-2">
-        <button type="button" role="tab" aria-selected="true" data-pdf-cat="all" class="pdf-cat-pill min-h-[40px] px-4 text-xs font-semibold rounded-full bg-[var(--ink-primary)] text-[var(--bg-panel)] border border-[var(--ink-primary)] transition-colors">All</button>
+        <button type="button" role="tab" aria-selected="true" data-pdf-cat="all" class="pdf-cat-pill min-h-[40px] px-4 text-xs font-semibold rounded-full bg-[var(--ink-primary)] text-[var(--bg-panel)] border border-[var(--ink-primary)] transition-colors">All (29)</button>
         <button type="button" role="tab" aria-selected="false" data-pdf-cat="organize" class="pdf-cat-pill min-h-[40px] px-4 text-xs font-medium rounded-full bg-[var(--bg-panel)] text-[var(--ink-secondary)] border border-[var(--border-hairline)] hover:border-[var(--accent)] hover:text-[var(--ink-primary)] transition-colors">Organize PDF</button>
         <button type="button" role="tab" aria-selected="false" data-pdf-cat="optimize" class="pdf-cat-pill min-h-[40px] px-4 text-xs font-medium rounded-full bg-[var(--bg-panel)] text-[var(--ink-secondary)] border border-[var(--border-hairline)] hover:border-[var(--accent)] hover:text-[var(--ink-primary)] transition-colors">Optimize PDF</button>
         <button type="button" role="tab" aria-selected="false" data-pdf-cat="convert" class="pdf-cat-pill min-h-[40px] px-4 text-xs font-medium rounded-full bg-[var(--bg-panel)] text-[var(--ink-secondary)] border border-[var(--border-hairline)] hover:border-[var(--accent)] hover:text-[var(--ink-primary)] transition-colors">Convert PDF</button>
+        <button type="button" role="tab" aria-selected="false" data-pdf-cat="edit" class="pdf-cat-pill min-h-[40px] px-4 text-xs font-medium rounded-full bg-[var(--bg-panel)] text-[var(--ink-secondary)] border border-[var(--border-hairline)] hover:border-[var(--accent)] hover:text-[var(--ink-primary)] transition-colors">Edit &amp; Review</button>
         <button type="button" role="tab" aria-selected="false" data-pdf-cat="security" class="pdf-cat-pill min-h-[40px] px-4 text-xs font-medium rounded-full bg-[var(--bg-panel)] text-[var(--ink-secondary)] border border-[var(--border-hairline)] hover:border-[var(--accent)] hover:text-[var(--ink-primary)] transition-colors">PDF Security</button>
+        <button type="button" role="tab" aria-selected="false" data-pdf-cat="ai" class="pdf-cat-pill min-h-[40px] px-4 text-xs font-medium rounded-full bg-[var(--bg-panel)] text-[var(--ink-secondary)] border border-[var(--border-hairline)] hover:border-[var(--accent)] hover:text-[var(--ink-primary)] transition-colors">AI &amp; Workflows</button>
       </div>
 
-      <!-- Spacious Tool Cards Grid (iLovePDF card anatomy, Cafe semantic tokens) -->
-      <div id="pdf-tool-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        <button type="button" data-pdf-tool="merge" data-pdf-cat="organize" class="pdf-tool-card group p-5 sm:p-6 text-left rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] hover:border-[var(--accent)] hover:-translate-y-0.5 card-elevated transition-all duration-200 flex flex-col gap-3.5">
-          <div class="w-11 h-11 rounded-xl bg-[var(--accent-soft)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--accent)]">
-            <i data-lucide="git-merge" class="w-5 h-5"></i>
-          </div>
-          <div class="space-y-1.5">
-            <h3 class="text-base font-bold text-[var(--ink-primary)] group-hover:text-[var(--accent)] transition-colors">Merge PDF</h3>
-            <p class="text-xs text-[var(--ink-muted)] leading-relaxed">Combine multiple PDF files into a single document in the order you want.</p>
-          </div>
-        </button>
-
-        <button type="button" data-pdf-tool="split" data-pdf-cat="organize" class="pdf-tool-card group p-5 sm:p-6 text-left rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] hover:border-[var(--accent)] hover:-translate-y-0.5 card-elevated transition-all duration-200 flex flex-col gap-3.5">
-          <div class="w-11 h-11 rounded-xl bg-[var(--gold-soft)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--gold)]">
-            <i data-lucide="scissors" class="w-5 h-5"></i>
-          </div>
-          <div class="space-y-1.5">
-            <h3 class="text-base font-bold text-[var(--ink-primary)] group-hover:text-[var(--accent)] transition-colors">Split PDF</h3>
-            <p class="text-xs text-[var(--ink-muted)] leading-relaxed">Extract specific page ranges or split every page into separate PDF files (.ZIP).</p>
-          </div>
-        </button>
-
-        <button type="button" data-pdf-tool="remove-pages" data-pdf-cat="organize" class="pdf-tool-card group p-5 sm:p-6 text-left rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] hover:border-[var(--accent)] hover:-translate-y-0.5 card-elevated transition-all duration-200 flex flex-col gap-3.5">
-          <div class="w-11 h-11 rounded-xl bg-[var(--crimson-soft)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--crimson)]">
-            <i data-lucide="file-minus-2" class="w-5 h-5"></i>
-          </div>
-          <div class="space-y-1.5">
-            <h3 class="text-base font-bold text-[var(--ink-primary)] group-hover:text-[var(--accent)] transition-colors">Remove Pages</h3>
-            <p class="text-xs text-[var(--ink-muted)] leading-relaxed">Delete unwanted pages from your PDF document and save the remaining pages cleanly.</p>
-          </div>
-        </button>
-
-        <button type="button" data-pdf-tool="rotate" data-pdf-cat="organize" class="pdf-tool-card group p-5 sm:p-6 text-left rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] hover:border-[var(--accent)] hover:-translate-y-0.5 card-elevated transition-all duration-200 flex flex-col gap-3.5">
-          <div class="w-11 h-11 rounded-xl bg-[var(--accent-soft)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--accent)]">
-            <i data-lucide="rotate-cw" class="w-5 h-5"></i>
-          </div>
-          <div class="space-y-1.5">
-            <h3 class="text-base font-bold text-[var(--ink-primary)] group-hover:text-[var(--accent)] transition-colors">Rotate PDF</h3>
-            <p class="text-xs text-[var(--ink-muted)] leading-relaxed">Rotate all or selected pages by 90°, 180°, or 270° clockwise.</p>
-          </div>
-        </button>
-
-        <button type="button" data-pdf-tool="compress" data-pdf-cat="optimize" class="pdf-tool-card group p-5 sm:p-6 text-left rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] hover:border-[var(--accent)] hover:-translate-y-0.5 card-elevated transition-all duration-200 flex flex-col gap-3.5">
-          <div class="w-11 h-11 rounded-xl bg-[var(--gold-soft)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--gold)]">
-            <i data-lucide="minimize-2" class="w-5 h-5"></i>
-          </div>
-          <div class="space-y-1.5">
-            <h3 class="text-base font-bold text-[var(--ink-primary)] group-hover:text-[var(--accent)] transition-colors">Compress PDF</h3>
-            <p class="text-xs text-[var(--ink-muted)] leading-relaxed">Reduce PDF file size by compressing content streams and embedded images locally.</p>
-          </div>
-        </button>
-
-        <button type="button" data-pdf-tool="ocr-pdf" data-pdf-cat="optimize" class="pdf-tool-card group p-5 sm:p-6 text-left rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] hover:border-[var(--accent)] hover:-translate-y-0.5 card-elevated transition-all duration-200 flex flex-col gap-3.5">
-          <div class="w-11 h-11 rounded-xl bg-[var(--accent-soft)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--accent)]">
-            <i data-lucide="scan-text" class="w-5 h-5"></i>
-          </div>
-          <div class="space-y-1.5">
-            <h3 class="text-base font-bold text-[var(--ink-primary)] group-hover:text-[var(--accent)] transition-colors">OCR PDF</h3>
-            <p class="text-xs text-[var(--ink-muted)] leading-relaxed">Extract clean text from scanned or photo-based PDFs using local RapidOCR (download .txt).</p>
-          </div>
-        </button>
-
-        <button type="button" data-pdf-tool="to-images" data-pdf-cat="convert" class="pdf-tool-card group p-5 sm:p-6 text-left rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] hover:border-[var(--accent)] hover:-translate-y-0.5 card-elevated transition-all duration-200 flex flex-col gap-3.5">
-          <div class="w-11 h-11 rounded-xl bg-[var(--gold-soft)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--gold)]">
-            <i data-lucide="images" class="w-5 h-5"></i>
-          </div>
-          <div class="space-y-1.5">
-            <h3 class="text-base font-bold text-[var(--ink-primary)] group-hover:text-[var(--accent)] transition-colors">PDF to JPG / PNG</h3>
-            <p class="text-xs text-[var(--ink-muted)] leading-relaxed">Convert every PDF page into high-resolution JPG or PNG images in a single .ZIP archive.</p>
-          </div>
-        </button>
-
-        <button type="button" data-pdf-tool="from-images" data-pdf-cat="convert" class="pdf-tool-card group p-5 sm:p-6 text-left rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] hover:border-[var(--accent)] hover:-translate-y-0.5 card-elevated transition-all duration-200 flex flex-col gap-3.5">
-          <div class="w-11 h-11 rounded-xl bg-[var(--accent-soft)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--accent)]">
-            <i data-lucide="file-plus-2" class="w-5 h-5"></i>
-          </div>
-          <div class="space-y-1.5">
-            <h3 class="text-base font-bold text-[var(--ink-primary)] group-hover:text-[var(--accent)] transition-colors">JPG / PNG to PDF</h3>
-            <p class="text-xs text-[var(--ink-muted)] leading-relaxed">Combine multiple JPG, PNG, or WebP images into a single share-ready PDF file.</p>
-          </div>
-        </button>
-
-        <button type="button" data-pdf-tool="to-markdown" data-pdf-cat="convert" class="pdf-tool-card group p-5 sm:p-6 text-left rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] hover:border-[var(--accent)] hover:-translate-y-0.5 card-elevated transition-all duration-200 flex flex-col gap-3.5">
-          <div class="w-11 h-11 rounded-xl bg-[var(--gold-soft)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--gold)]">
-            <i data-lucide="file-code-2" class="w-5 h-5"></i>
-          </div>
-          <div class="space-y-1.5">
-            <h3 class="text-base font-bold text-[var(--ink-primary)] group-hover:text-[var(--accent)] transition-colors">PDF to Markdown</h3>
-            <p class="text-xs text-[var(--ink-muted)] leading-relaxed">Convert PDF documents into clean Markdown (.md) files via Microsoft MarkItDown + RapidOCR.</p>
-          </div>
-        </button>
-
-        <button type="button" data-pdf-tool="protect" data-pdf-cat="security" class="pdf-tool-card group p-5 sm:p-6 text-left rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] hover:border-[var(--accent)] hover:-translate-y-0.5 card-elevated transition-all duration-200 flex flex-col gap-3.5">
-          <div class="w-11 h-11 rounded-xl bg-[var(--accent-soft)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--accent)]">
-            <i data-lucide="lock" class="w-5 h-5"></i>
-          </div>
-          <div class="space-y-1.5">
-            <h3 class="text-base font-bold text-[var(--ink-primary)] group-hover:text-[var(--accent)] transition-colors">Protect PDF</h3>
-            <p class="text-xs text-[var(--ink-muted)] leading-relaxed">Protect sensitive PDF documents with password encryption before sharing or archiving.</p>
-          </div>
-        </button>
-
-        <button type="button" data-pdf-tool="unlock" data-pdf-cat="security" class="pdf-tool-card group p-5 sm:p-6 text-left rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] hover:border-[var(--accent)] hover:-translate-y-0.5 card-elevated transition-all duration-200 flex flex-col gap-3.5">
-          <div class="w-11 h-11 rounded-xl bg-[var(--gold-soft)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--gold)]">
-            <i data-lucide="unlock" class="w-5 h-5"></i>
-          </div>
-          <div class="space-y-1.5">
-            <h3 class="text-base font-bold text-[var(--ink-primary)] group-hover:text-[var(--accent)] transition-colors">Unlock PDF</h3>
-            <p class="text-xs text-[var(--ink-muted)] leading-relaxed">Remove password protection from your PDF files so they can be opened and edited freely.</p>
-          </div>
-        </button>
-      </div>
+      <!-- Spacious Tool Cards Grid (populated from PDF_TOOLS_META) -->
+      <div id="pdf-tool-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
     </div>
 
     <!-- State B: Focused Active Tool Workspace -->
@@ -839,6 +736,219 @@
           </select>
         </div>
 
+        <!-- Organize PDF Options (Order + Visual Thumbnails) -->
+        <div id="pdf-options-organize" class="hidden space-y-3">
+          <div class="flex flex-col sm:flex-row gap-2">
+            <div class="flex-grow">
+              <label for="pdf-organize-order" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Page order (e.g. 3, 1, 2, 4-6 or "reverse")</label>
+              <input id="pdf-organize-order" type="text" placeholder="e.g. 1, 2, 3" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] font-mono" />
+            </div>
+            <button id="pdf-organize-reverse-btn" type="button" class="self-end min-h-[42px] px-4 text-xs font-semibold rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] hover:border-[var(--accent)] text-[var(--ink-primary)]">Reverse Order</button>
+          </div>
+          <div id="pdf-organize-thumbs" class="hidden grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5 max-h-72 overflow-y-auto p-1"></div>
+        </div>
+
+        <!-- Crop PDF Options -->
+        <div id="pdf-options-crop" class="hidden space-y-3">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div>
+              <label for="pdf-crop-top" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Top</label>
+              <input id="pdf-crop-top" type="number" min="0" value="15" class="w-full min-h-[40px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] font-mono" />
+            </div>
+            <div>
+              <label for="pdf-crop-right" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Right</label>
+              <input id="pdf-crop-right" type="number" min="0" value="15" class="w-full min-h-[40px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] font-mono" />
+            </div>
+            <div>
+              <label for="pdf-crop-bottom" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Bottom</label>
+              <input id="pdf-crop-bottom" type="number" min="0" value="15" class="w-full min-h-[40px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] font-mono" />
+            </div>
+            <div>
+              <label for="pdf-crop-left" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Left</label>
+              <input id="pdf-crop-left" type="number" min="0" value="15" class="w-full min-h-[40px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] font-mono" />
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label for="pdf-crop-unit" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Unit</label>
+              <select id="pdf-crop-unit" class="w-full min-h-[40px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+                <option value="mm">Millimeters (mm)</option>
+                <option value="pt">Points (pt)</option>
+                <option value="pct">Percentage (%)</option>
+              </select>
+            </div>
+            <div>
+              <label for="pdf-crop-pages" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Specific pages (optional)</label>
+              <input id="pdf-crop-pages" type="text" placeholder="All pages if blank (e.g. 1-5)" class="w-full min-h-[40px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] font-mono" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Watermark Options -->
+        <div id="pdf-options-watermark" class="hidden space-y-3">
+          <div>
+            <label for="pdf-wm-text" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Watermark text</label>
+            <input id="pdf-wm-text" type="text" value="CONFIDENTIAL" placeholder="e.g. CONFIDENTIAL or DRAFT" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]" />
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div>
+              <label for="pdf-wm-opacity" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Opacity</label>
+              <select id="pdf-wm-opacity" class="w-full min-h-[40px] px-2.5 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+                <option value="0.15">15% (Subtle)</option>
+                <option value="0.25" selected>25% (Balanced)</option>
+                <option value="0.45">45% (Bold)</option>
+                <option value="0.7">70% (Strong)</option>
+              </select>
+            </div>
+            <div>
+              <label for="pdf-wm-angle" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Angle</label>
+              <select id="pdf-wm-angle" class="w-full min-h-[40px] px-2.5 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+                <option value="45" selected>45° Diagonal</option>
+                <option value="0">0° Horizontal</option>
+                <option value="-45">-45° Diagonal</option>
+              </select>
+            </div>
+            <div>
+              <label for="pdf-wm-size" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Font size</label>
+              <input id="pdf-wm-size" type="number" min="12" max="120" value="44" class="w-full min-h-[40px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] font-mono" />
+            </div>
+            <div>
+              <label for="pdf-wm-pos" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Position</label>
+              <select id="pdf-wm-pos" class="w-full min-h-[40px] px-2.5 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+                <option value="center" selected>Center</option>
+                <option value="top">Top</option>
+                <option value="bottom">Bottom</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Page Numbers Options -->
+        <div id="pdf-options-page-numbers" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label for="pdf-pn-pos" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Position</label>
+            <select id="pdf-pn-pos" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+              <option value="bottom-center">Bottom Center</option>
+              <option value="bottom-right">Bottom Right</option>
+              <option value="bottom-left">Bottom Left</option>
+              <option value="top-right">Top Right</option>
+              <option value="top-center">Top Center</option>
+            </select>
+          </div>
+          <div>
+            <label for="pdf-pn-fmt" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Number format</label>
+            <select id="pdf-pn-fmt" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+              <option value="page_of">Page 1 of 10</option>
+              <option value="slash">1 / 10</option>
+              <option value="simple">1</option>
+            </select>
+          </div>
+          <div>
+            <label for="pdf-pn-start" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Starting number</label>
+            <input id="pdf-pn-start" type="number" min="1" value="1" class="w-full min-h-[40px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] font-mono" />
+          </div>
+          <div>
+            <label for="pdf-pn-size" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Font size (pt)</label>
+            <input id="pdf-pn-size" type="number" min="8" max="28" value="11" class="w-full min-h-[40px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] font-mono" />
+          </div>
+        </div>
+
+        <!-- Sign PDF Options (Interactive Drawing Pad) -->
+        <div id="pdf-options-sign" class="hidden space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-medium text-[var(--ink-secondary)]">Draw your signature below</label>
+            <button id="pdf-sign-clear-btn" type="button" class="text-xs font-medium text-[var(--ink-muted)] hover:text-[var(--crimson)]">Clear signature</button>
+          </div>
+          <canvas id="pdf-sign-canvas" width="560" height="150" class="w-full h-[150px] rounded-xl bg-white border border-[var(--border-strong)] cursor-crosshair touch-none"></canvas>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div>
+              <label for="pdf-sign-page" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Target page</label>
+              <input id="pdf-sign-page" type="text" value="last" placeholder="last, all, or 1, 3" class="w-full min-h-[40px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] font-mono" />
+            </div>
+            <div>
+              <label for="pdf-sign-pos" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Position</label>
+              <select id="pdf-sign-pos" class="w-full min-h-[40px] px-2.5 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+                <option value="bottom-right" selected>Bottom Right</option>
+                <option value="bottom-left">Bottom Left</option>
+                <option value="bottom-center">Bottom Center</option>
+                <option value="center">Center</option>
+                <option value="top-right">Top Right</option>
+              </select>
+            </div>
+            <div>
+              <label for="pdf-sign-width" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Width (% of page)</label>
+              <input id="pdf-sign-width" type="number" min="10" max="60" value="24" class="w-full min-h-[40px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] font-mono" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Redact PDF Options -->
+        <div id="pdf-options-redact" class="hidden">
+          <label for="pdf-redact-terms" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Words or phrases to permanently redact (comma or line separated)</label>
+          <textarea id="pdf-redact-terms" rows="3" placeholder="e.g. John Doe, 123-45-6789, Confidential" class="w-full p-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] font-mono"></textarea>
+        </div>
+
+        <!-- HTML to PDF Options -->
+        <div id="pdf-options-html-to-pdf" class="hidden">
+          <label for="pdf-html-url" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Web URL (optional — or drop an .html file above)</label>
+          <input id="pdf-html-url" type="url" placeholder="https://example.com" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] font-mono" />
+        </div>
+
+        <!-- To PPTX Options -->
+        <div id="pdf-options-to-pptx" class="hidden">
+          <label for="pdf-pptx-dpi" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Slide Resolution (DPI)</label>
+          <select id="pdf-pptx-dpi" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+            <option value="150">150 DPI (Standard)</option>
+            <option value="200">200 DPI (Sharp)</option>
+          </select>
+        </div>
+
+        <!-- AI Summarizer Options -->
+        <div id="pdf-options-ai-summarize" class="hidden space-y-2.5">
+          <div>
+            <label for="pdf-ai-style" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Summary Style</label>
+            <select id="pdf-ai-style" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+              <option value="executive">Executive Summary (Key Takeaways &amp; Conclusions)</option>
+              <option value="bullets">Concise Bullet Points</option>
+              <option value="study">Structured Study Notes</option>
+            </select>
+          </div>
+          <p class="text-[11px] text-[var(--ink-muted)]">Uses the LLM configured in Settings (Ollama, LM Studio, or OpenAI-compatible API). Configure it via the top-right sliders icon if not set yet.</p>
+          <div id="pdf-ai-preview" class="hidden p-4 rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-hairline)] max-h-72 overflow-y-auto prose-custom text-xs"></div>
+        </div>
+
+        <!-- Custom Workflow Options -->
+        <div id="pdf-options-workflow" class="hidden space-y-3 p-4 rounded-xl bg-[var(--bg-elevated)]/70 border border-[var(--border-hairline)]">
+          <p class="text-xs font-semibold text-[var(--ink-primary)]">Pipeline Steps (executed in order; 2+ files are merged first)</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div>
+              <label for="wf-rotate" class="block text-[11px] font-medium text-[var(--ink-secondary)] mb-1">1. Rotate</label>
+              <select id="wf-rotate" class="w-full min-h-[38px] px-2.5 rounded-xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+                <option value="0">Skip rotation</option>
+                <option value="90">90° Clockwise</option>
+                <option value="180">180° Flip</option>
+                <option value="270">270° Clockwise</option>
+              </select>
+            </div>
+            <div>
+              <label for="wf-watermark" class="block text-[11px] font-medium text-[var(--ink-secondary)] mb-1">2. Watermark (leave blank to skip)</label>
+              <input id="wf-watermark" type="text" placeholder="e.g. INTERNAL COPY" class="w-full min-h-[38px] px-3 rounded-xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] text-[var(--ink-primary)]" />
+            </div>
+            <label class="flex items-center gap-2.5 p-2.5 rounded-xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] cursor-pointer">
+              <input id="wf-page-numbers" type="checkbox" class="w-4 h-4 accent-[var(--accent)]" />
+              <span class="text-[var(--ink-primary)] font-medium">3. Add Page Numbers</span>
+            </label>
+            <label class="flex items-center gap-2.5 p-2.5 rounded-xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] cursor-pointer">
+              <input id="wf-compress" type="checkbox" checked class="w-4 h-4 accent-[var(--accent)]" />
+              <span class="text-[var(--ink-primary)] font-medium">4. Compress PDF</span>
+            </label>
+            <div class="sm:col-span-2">
+              <label for="wf-password" class="block text-[11px] font-medium text-[var(--ink-secondary)] mb-1">5. Protect with Password (optional)</label>
+              <input id="wf-password" type="password" placeholder="Leave blank to keep unlocked" class="w-full min-h-[38px] px-3 rounded-xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] text-[var(--ink-primary)]" />
+            </div>
+          </div>
+        </div>
+
         <!-- Password Options (Protect / Unlock) -->
         <div id="pdf-options-password" class="hidden">
           <label for="pdf-password-input" id="pdf-password-label" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">PDF Password</label>
@@ -861,6 +971,22 @@
       </div>
     </div>
   </section>
+
+  <!-- Feature Search Command Palette Modal -->
+  <div id="feature-search-modal" role="dialog" aria-modal="true" aria-label="Search Local-Folio tools" class="fixed inset-0 bg-black/45 backdrop-blur-xs z-50 hidden flex items-start justify-center pt-16 sm:pt-24 px-4">
+    <div class="w-full max-w-xl rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-strong)] card-elevated overflow-hidden">
+      <div class="flex items-center gap-3 px-4 py-3.5 border-b border-[var(--border-hairline)]">
+        <i data-lucide="search" class="w-4 h-4 text-[var(--accent)] shrink-0"></i>
+        <input id="feature-search-input" type="text" placeholder="Search 31 local tools (e.g. Merge, Word, Watermark, OCR, Redact)..." autocomplete="off" class="w-full bg-transparent text-sm text-[var(--ink-primary)] placeholder-[var(--ink-muted)] focus:outline-none" />
+        <kbd class="hidden sm:inline-block px-2 py-0.5 text-[10px] font-mono rounded-md bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-muted)]">ESC</kbd>
+      </div>
+      <div id="feature-search-results" class="max-h-[380px] overflow-y-auto p-2 space-y-1"></div>
+      <div class="px-4 py-2 bg-[var(--bg-elevated)]/70 border-t border-[var(--border-hairline)] flex items-center justify-between text-[11px] text-[var(--ink-muted)] font-mono">
+        <span>Use ↑ ↓ and Enter to open tool</span>
+        <span id="feature-search-count">31 tools</span>
+      </div>
+    </div>
+  </div>
 
   <!-- Slide-Over Settings Drawer -->
   <div id="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title" class="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 hidden flex justify-end">
@@ -1021,7 +1147,7 @@
 
     function switchMainView(viewName) {
       activeMainView = viewName;
-      document.querySelectorAll('.t-expanding-tab').forEach(btn => {
+      document.querySelectorAll('.t-expanding-tab[data-view]').forEach(btn => {
         const active = btn.getAttribute('data-view') === viewName;
         btn.setAttribute('aria-selected', String(active));
       });
@@ -1805,23 +1931,63 @@
       refreshIcons();
     }
 
-    // ── VIEW 3: LOCAL PDF TOOLKIT (iLovePDF Directory + Focused Workspace) ───
+    // ── VIEW 3: LOCAL PDF TOOLKIT (29 Tools — iLovePDF Directory + Workspace) ─
     let activePdfTool = 'merge';
     let pdfSelectedFiles = [];
     let pdfInWorkspace = false;
+    let organizeThumbItems = [];
+    let sigHasDrawn = false;
 
     const PDF_TOOLS_META = {
-      merge: { title: 'Merge PDF', desc: 'Select 2 or more PDF files to merge into a single document.', accept: '.pdf', multiple: true, btn: 'Merge PDF' },
-      split: { title: 'Split PDF', desc: 'Extract specific page ranges or split every page into a .ZIP archive.', accept: '.pdf', multiple: false, btn: 'Split PDF' },
-      'remove-pages': { title: 'Remove Pages', desc: 'Delete specific page numbers from a PDF document locally.', accept: '.pdf', multiple: false, btn: 'Remove Selected Pages' },
-      rotate: { title: 'Rotate PDF', desc: 'Rotate all or selected pages clockwise (90 / 180 / 270°).', accept: '.pdf', multiple: false, btn: 'Rotate PDF' },
-      compress: { title: 'Compress PDF', desc: 'Reduce PDF file size with local stream and image compression.', accept: '.pdf', multiple: false, btn: 'Compress PDF' },
-      'ocr-pdf': { title: 'OCR PDF (RapidOCR)', desc: 'Extract all text from scanned or image-based PDFs to a .txt file locally.', accept: '.pdf', multiple: false, btn: 'Run OCR PDF (.txt)' },
-      'to-images': { title: 'PDF to JPG / PNG', desc: 'Render every PDF page as high-resolution images inside a .ZIP archive.', accept: '.pdf', multiple: false, btn: 'Render Images (.ZIP)' },
-      'from-images': { title: 'JPG / PNG to PDF', desc: 'Combine multiple JPG, PNG, or WebP images into a single PDF file.', accept: '.jpg,.jpeg,.png,.webp,.bmp', multiple: true, btn: 'Create PDF' },
-      'to-markdown': { title: 'PDF to Markdown', desc: 'Convert PDF documents to Markdown (.md) via Microsoft MarkItDown + RapidOCR.', accept: '.pdf', multiple: false, btn: 'Convert to .MD' },
-      protect: { title: 'Protect PDF', desc: 'Encrypt your PDF file with a password locally.', accept: '.pdf', multiple: false, btn: 'Protect PDF' },
-      unlock: { title: 'Unlock PDF', desc: 'Remove password protection from an encrypted PDF file.', accept: '.pdf', multiple: false, btn: 'Unlock PDF' }
+      // Organize PDF
+      merge: { title: 'Merge PDF', desc: 'Combine multiple PDF files into a single document in the order you want.', accept: '.pdf', multiple: true, btn: 'Merge PDF', cat: 'organize', icon: 'git-merge', tone: 'accent', kw: 'gabung gabungkan combine join' },
+      split: { title: 'Split PDF', desc: 'Extract specific page ranges or split every page into separate PDF files (.ZIP).', accept: '.pdf', multiple: false, btn: 'Split PDF', cat: 'organize', icon: 'scissors', tone: 'gold', kw: 'pisah pisahkan extract burst' },
+      'remove-pages': { title: 'Remove Pages', desc: 'Delete unwanted pages from your PDF document and save the remaining pages cleanly.', accept: '.pdf', multiple: false, btn: 'Remove Selected Pages', cat: 'organize', icon: 'file-minus-2', tone: 'crimson', kw: 'hapus delete drop' },
+      organize: { title: 'Organize PDF', desc: 'Visually reorder, reverse, or drop pages with thumbnail previews.', accept: '.pdf', multiple: false, btn: 'Save Organized PDF', cat: 'organize', icon: 'layout-grid', tone: 'accent', kw: 'atur sortir reorder sort urutan' },
+      rotate: { title: 'Rotate PDF', desc: 'Rotate all or selected pages by 90°, 180°, or 270° clockwise.', accept: '.pdf', multiple: false, btn: 'Rotate PDF', cat: 'organize', icon: 'rotate-cw', tone: 'gold', kw: 'putar orientasi' },
+      crop: { title: 'Crop PDF', desc: 'Trim top, right, bottom, and left margins across all or selected pages.', accept: '.pdf', multiple: false, btn: 'Crop PDF', cat: 'organize', icon: 'crop', tone: 'accent', kw: 'potong margin trim' },
+
+      // Optimize PDF
+      compress: { title: 'Compress PDF', desc: 'Reduce PDF file size by compressing content streams and embedded images locally.', accept: '.pdf', multiple: false, btn: 'Compress PDF', cat: 'optimize', icon: 'minimize-2', tone: 'gold', kw: 'kompres perkecil shrink' },
+      repair: { title: 'Repair PDF', desc: 'Rebuild corrupted xref tables and object streams to recover damaged PDFs.', accept: '.pdf', multiple: false, btn: 'Repair PDF', cat: 'optimize', icon: 'wrench', tone: 'accent', kw: 'perbaiki fix recover rusak' },
+      'ocr-pdf': { title: 'OCR PDF', desc: 'Extract clean text using Smart Hybrid mode or RapidOCR on scanned pages (.txt).', accept: '.pdf', multiple: false, btn: 'Run OCR PDF (.txt)', cat: 'optimize', icon: 'scan-text', tone: 'accent', kw: 'scan teks rapidocr extract' },
+      'pdf-to-pdfa': { title: 'PDF to PDF/A', desc: 'Convert PDF into archival PDF/A-2b format with flattened annotations and XMP metadata.', accept: '.pdf', multiple: false, btn: 'Convert to PDF/A', cat: 'optimize', icon: 'archive', tone: 'gold', kw: 'pdfa archive arsip iso' },
+
+      // Convert PDF
+      'to-word': { title: 'PDF to Word', desc: 'Convert PDF files into editable Microsoft Word (.docx) documents locally.', accept: '.pdf', multiple: false, btn: 'Convert to Word (.docx)', cat: 'convert', icon: 'file-type', tone: 'accent', kw: 'docx doc ubah' },
+      'to-pptx': { title: 'PDF to PowerPoint', desc: 'Turn each PDF page into crisp PowerPoint (.pptx) presentation slides.', accept: '.pdf', multiple: false, btn: 'Convert to PowerPoint (.pptx)', cat: 'convert', icon: 'presentation', tone: 'gold', kw: 'ppt slide presentasi' },
+      'to-excel': { title: 'PDF to Excel', desc: 'Extract PDF tables and structured rows directly into Excel (.xlsx) spreadsheets.', accept: '.pdf', multiple: false, btn: 'Convert to Excel (.xlsx)', cat: 'convert', icon: 'table', tone: 'accent', kw: 'xlsx spreadsheet tabel' },
+      'to-images': { title: 'PDF to JPG / PNG', desc: 'Render every PDF page as high-resolution JPG or PNG images in a .ZIP archive.', accept: '.pdf', multiple: false, btn: 'Render Images (.ZIP)', cat: 'convert', icon: 'images', tone: 'gold', kw: 'gambar foto jpeg png' },
+      'to-markdown': { title: 'PDF to Markdown', desc: 'Convert PDF documents into clean Markdown (.md) via Microsoft MarkItDown + RapidOCR.', accept: '.pdf', multiple: false, btn: 'Convert to .MD', cat: 'convert', icon: 'file-code-2', tone: 'accent', kw: 'md llm catatan' },
+      'word-to-pdf': { title: 'Word to PDF', desc: 'Convert .doc and .docx documents to PDF using native local Office / LibreOffice.', accept: '.doc,.docx', multiple: false, btn: 'Convert Word to PDF', cat: 'convert', icon: 'file-text', tone: 'accent', kw: 'docx doc' },
+      'pptx-to-pdf': { title: 'PowerPoint to PDF', desc: 'Convert .ppt and .pptx slide decks into share-ready PDF documents locally.', accept: '.ppt,.pptx', multiple: false, btn: 'Convert PowerPoint to PDF', cat: 'convert', icon: 'projector', tone: 'gold', kw: 'ppt slide' },
+      'excel-to-pdf': { title: 'Excel to PDF', desc: 'Convert .xls and .xlsx workbooks to clean PDF documents locally.', accept: '.xls,.xlsx', multiple: false, btn: 'Convert Excel to PDF', cat: 'convert', icon: 'sheet', tone: 'accent', kw: 'xlsx spreadsheet' },
+      'from-images': { title: 'JPG / PNG to PDF', desc: 'Combine multiple JPG, PNG, or WebP images into a single share-ready PDF file.', accept: '.jpg,.jpeg,.png,.webp,.bmp', multiple: true, btn: 'Create PDF', cat: 'convert', icon: 'file-plus-2', tone: 'gold', kw: 'gambar foto image' },
+      'html-to-pdf': { title: 'HTML to PDF', desc: 'Render an .html file or web URL into PDF using local headless Edge/Chrome.', accept: '.html,.htm', multiple: false, btn: 'Render HTML to PDF', cat: 'convert', icon: 'globe', tone: 'accent', kw: 'web url halaman', optionalFile: true },
+
+      // Edit & Review
+      watermark: { title: 'Watermark PDF', desc: 'Stamp custom text watermarks with adjustable opacity, rotation, size, and position.', accept: '.pdf', multiple: false, btn: 'Apply Watermark', cat: 'edit', icon: 'stamp', tone: 'accent', kw: 'tanda air confidential draft' },
+      'page-numbers': { title: 'Page Numbers', desc: 'Add clean page numbers with customizable format, position, and starting number.', accept: '.pdf', multiple: false, btn: 'Add Page Numbers', cat: 'edit', icon: 'hash', tone: 'gold', kw: 'nomor halaman pagination' },
+      sign: { title: 'Sign PDF', desc: 'Draw your handwritten signature on the canvas and stamp it onto any PDF page.', accept: '.pdf', multiple: false, btn: 'Sign PDF', cat: 'edit', icon: 'pen-tool', tone: 'accent', kw: 'tanda tangan e-sign signature' },
+      compare: { title: 'Compare PDF', desc: 'Upload 2 PDF versions to generate a side-by-side HTML diff report of text changes.', accept: '.pdf', multiple: true, btn: 'Compare 2 PDFs', cat: 'edit', icon: 'columns-2', tone: 'gold', kw: 'bandingkan diff perubahan' },
+
+      // PDF Security
+      protect: { title: 'Protect PDF', desc: 'Encrypt sensitive PDF documents with a password before sharing or archiving.', accept: '.pdf', multiple: false, btn: 'Protect PDF', cat: 'security', icon: 'lock', tone: 'accent', kw: 'kunci proteksi enkripsi password' },
+      unlock: { title: 'Unlock PDF', desc: 'Remove password protection from an encrypted PDF file you own.', accept: '.pdf', multiple: false, btn: 'Unlock PDF', cat: 'security', icon: 'unlock', tone: 'gold', kw: 'buka kunci decrypt' },
+      redact: { title: 'Redact PDF', desc: 'Permanently destroy sensitive words or phrases from the PDF text stream.', accept: '.pdf', multiple: false, btn: 'Redact Sensitive Text', cat: 'security', icon: 'eye-off', tone: 'crimson', kw: 'samarkan sensor hapus sensitif' },
+
+      // AI & Workflows
+      'ai-summarize': { title: 'AI Summarizer', desc: 'Summarize any PDF into clean Markdown using your configured local or cloud LLM.', accept: '.pdf', multiple: false, btn: 'Generate AI Summary (.md)', cat: 'ai', icon: 'sparkles', tone: 'accent', kw: 'perangkum ringkas ollama openai' },
+      workflow: { title: 'Custom Workflow', desc: 'Chain multiple local PDF operations (merge, rotate, watermark, compress, protect) in 1 click.', accept: '.pdf', multiple: true, btn: 'Run Custom Workflow', cat: 'ai', icon: 'workflow', tone: 'gold', kw: 'alur kerja automate pipeline batch' }
+    };
+
+    const PDF_CAT_LABELS = {
+      organize: 'Organize PDF',
+      optimize: 'Optimize PDF',
+      convert: 'Convert PDF',
+      edit: 'Edit & Review',
+      security: 'PDF Security',
+      ai: 'AI & Workflows'
     };
 
     const pdfDirectoryView = document.getElementById('pdf-directory-view');
@@ -1830,6 +1996,33 @@
     const pdfDropZone = document.getElementById('pdf-drop-zone');
     const pdfFileList = document.getElementById('pdf-file-list');
     const pdfResultInfo = document.getElementById('pdf-result-info');
+
+    function renderPdfToolDirectory() {
+      const grid = document.getElementById('pdf-tool-grid');
+      if (!grid) return;
+      grid.innerHTML = '';
+      Object.entries(PDF_TOOLS_META).forEach(([id, meta]) => {
+        const toneBg = meta.tone === 'crimson' ? 'bg-[var(--crimson-soft)] text-[var(--crimson)]'
+          : meta.tone === 'gold' ? 'bg-[var(--gold-soft)] text-[var(--gold)]'
+          : 'bg-[var(--accent-soft)] text-[var(--accent)]';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.pdfTool = id;
+        btn.dataset.pdfCat = meta.cat;
+        btn.className = 'pdf-tool-card group p-5 sm:p-6 text-left rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] hover:border-[var(--accent)] hover:-translate-y-0.5 card-elevated transition-all duration-200 flex flex-col gap-3.5';
+        btn.innerHTML = `
+          <div class="w-11 h-11 rounded-xl ${toneBg} border border-[var(--border-hairline)] flex items-center justify-center">
+            <i data-lucide="${meta.icon}" class="w-5 h-5"></i>
+          </div>
+          <div class="space-y-1.5">
+            <h3 class="text-base font-bold text-[var(--ink-primary)] group-hover:text-[var(--accent)] transition-colors">${escapeHtml(meta.title)}</h3>
+            <p class="text-xs text-[var(--ink-muted)] leading-relaxed">${escapeHtml(meta.desc)}</p>
+          </div>`;
+        btn.addEventListener('click', () => selectPdfTool(id, true));
+        grid.appendChild(btn);
+      });
+      refreshIcons();
+    }
 
     function showPdfDirectory() {
       pdfInWorkspace = false;
@@ -1852,24 +2045,141 @@
       });
     }
 
+    // ── Organize PDF Thumbnail Preview Helper ────────────────────────────────
+    async function loadOrganizeThumbnails(file) {
+      const container = document.getElementById('pdf-organize-thumbs');
+      const orderInput = document.getElementById('pdf-organize-order');
+      if (!backendAvailable || !file) return;
+      container.classList.remove('hidden');
+      container.innerHTML = '<div class="col-span-full text-center text-xs text-[var(--ink-muted)] py-4 font-mono">Loading page thumbnails...</div>';
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch(`${API_BASE}/api/pdf/thumbnails`, { method: 'POST', body: fd });
+        if (!res.ok) throw new Error('Failed to load thumbnails');
+        const data = await res.json();
+        organizeThumbItems = data.thumbnails || [];
+        orderInput.value = organizeThumbItems.map(t => t.page).join(', ');
+        renderOrganizeThumbs();
+      } catch (err) {
+        container.innerHTML = `<div class="col-span-full text-center text-xs text-[var(--ink-muted)] py-2">Enter page order manually (e.g. 3, 1, 2)</div>`;
+      }
+    }
+
+    function renderOrganizeThumbs() {
+      const container = document.getElementById('pdf-organize-thumbs');
+      const orderInput = document.getElementById('pdf-organize-order');
+      container.innerHTML = '';
+      container.classList.toggle('hidden', organizeThumbItems.length === 0);
+      orderInput.value = organizeThumbItems.map(t => t.page).join(', ');
+      organizeThumbItems.forEach((item, idx) => {
+        const card = document.createElement('div');
+        card.className = 'p-1.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] flex flex-col items-center gap-1';
+        card.innerHTML = `
+          <img src="${item.src}" alt="Page ${item.page}" class="w-full h-24 object-contain rounded-lg bg-white border border-[var(--border-hairline)]" />
+          <div class="w-full flex items-center justify-between text-[10px] font-mono px-0.5">
+            <span class="text-[var(--ink-primary)] font-semibold">P.${item.page}</span>
+            <div class="flex items-center gap-1">
+              <button type="button" data-op="left" class="px-1 rounded hover:bg-[var(--bg-panel)] text-[var(--ink-secondary)]" title="Move left">◀</button>
+              <button type="button" data-op="right" class="px-1 rounded hover:bg-[var(--bg-panel)] text-[var(--ink-secondary)]" title="Move right">▶</button>
+              <button type="button" data-op="del" class="px-1 rounded hover:bg-[var(--crimson-soft)] text-[var(--crimson)]" title="Remove">×</button>
+            </div>
+          </div>`;
+        card.querySelectorAll('button').forEach(b => {
+          b.addEventListener('click', () => {
+            const op = b.dataset.op;
+            if (op === 'left' && idx > 0) {
+              [organizeThumbItems[idx - 1], organizeThumbItems[idx]] = [organizeThumbItems[idx], organizeThumbItems[idx - 1]];
+            } else if (op === 'right' && idx < organizeThumbItems.length - 1) {
+              [organizeThumbItems[idx + 1], organizeThumbItems[idx]] = [organizeThumbItems[idx], organizeThumbItems[idx + 1]];
+            } else if (op === 'del') {
+              organizeThumbItems.splice(idx, 1);
+            }
+            renderOrganizeThumbs();
+          });
+        });
+        container.appendChild(card);
+      });
+    }
+
+    // ── Sign PDF Interactive Canvas Pad ──────────────────────────────────────
+    function setupSignatureCanvas() {
+      const canvas = document.getElementById('pdf-sign-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.strokeStyle = '#1b1410';
+      ctx.lineWidth = 2.6;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      let drawing = false;
+
+      const getPos = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+      };
+
+      const start = (e) => {
+        e.preventDefault();
+        drawing = true;
+        sigHasDrawn = true;
+        const p = getPos(e);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+      };
+      const move = (e) => {
+        if (!drawing) return;
+        e.preventDefault();
+        const p = getPos(e);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+      };
+      const end = () => { drawing = false; };
+
+      canvas.addEventListener('mousedown', start);
+      canvas.addEventListener('mousemove', move);
+      window.addEventListener('mouseup', end);
+      canvas.addEventListener('touchstart', start, { passive: false });
+      canvas.addEventListener('touchmove', move, { passive: false });
+      canvas.addEventListener('touchend', end);
+
+      document.getElementById('pdf-sign-clear-btn').addEventListener('click', () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        sigHasDrawn = false;
+      });
+    }
+
     function selectPdfTool(toolId, openWorkspace = true) {
       activePdfTool = toolId;
       pdfSelectedFiles = [];
+      organizeThumbItems = [];
       renderPdfFileList();
       const meta = PDF_TOOLS_META[toolId];
       document.getElementById('pdf-active-title').textContent = meta.title;
       document.getElementById('pdf-active-desc').textContent = meta.desc;
       document.getElementById('pdf-run-label').textContent = meta.btn;
-      document.getElementById('pdf-input-hint').textContent = `Accepts ${meta.accept} (${meta.multiple ? 'multiple files' : 'single file'})`;
+      document.getElementById('pdf-input-hint').textContent = meta.optionalFile
+        ? `Accepts ${meta.accept} (or enter a URL below)`
+        : `Accepts ${meta.accept} (${meta.multiple ? 'multiple files' : 'single file'})`;
       pdfToolInput.accept = meta.accept;
       pdfToolInput.multiple = meta.multiple;
       pdfResultInfo.textContent = 'Ready to process';
 
-      document.getElementById('pdf-options-split').classList.toggle('hidden', toolId !== 'split');
-      document.getElementById('pdf-options-remove-pages').classList.toggle('hidden', toolId !== 'remove-pages');
-      document.getElementById('pdf-options-rotate').classList.toggle('hidden', toolId !== 'rotate');
-      document.getElementById('pdf-options-to-images').classList.toggle('hidden', toolId !== 'to-images');
-      document.getElementById('pdf-options-ocr-pdf').classList.toggle('hidden', toolId !== 'ocr-pdf');
+      const optionIds = [
+        'split', 'remove-pages', 'rotate', 'to-images', 'ocr-pdf',
+        'organize', 'crop', 'watermark', 'page-numbers', 'sign',
+        'redact', 'html-to-pdf', 'to-pptx', 'ai-summarize', 'workflow'
+      ];
+      optionIds.forEach(opt => {
+        const el = document.getElementById(`pdf-options-${opt}`);
+        if (el) el.classList.toggle('hidden', toolId !== opt);
+      });
+      document.getElementById('pdf-organize-thumbs').classList.add('hidden');
+      document.getElementById('pdf-ai-preview').classList.add('hidden');
+
       const needsPassword = toolId === 'protect' || toolId === 'unlock';
       document.getElementById('pdf-options-password').classList.toggle('hidden', !needsPassword);
       if (needsPassword) {
@@ -1895,6 +2205,9 @@
       pdfSelectedFiles = PDF_TOOLS_META[activePdfTool].multiple ? [...pdfSelectedFiles, ...files] : files.slice(0, 1);
       renderPdfFileList();
       showToast(`Added ${files.length} file${files.length > 1 ? 's' : ''} to ${PDF_TOOLS_META[activePdfTool].title}`, 'info');
+      if (activePdfTool === 'organize' && pdfSelectedFiles[0]) {
+        loadOrganizeThumbnails(pdfSelectedFiles[0]);
+      }
     }
 
     function renderPdfFileList() {
@@ -1914,8 +2227,16 @@
 
     async function runActivePdfTool() {
       if (!backendAvailable) { showToast('Run local-folio.bat to use local PDF Tools', 'warning'); return; }
-      if (!pdfSelectedFiles.length) { showToast('Please select a file first', 'warning'); return; }
-      if (activePdfTool === 'merge' && pdfSelectedFiles.length < 2) { showToast('Select at least 2 PDF files to merge', 'warning'); return; }
+      const meta = PDF_TOOLS_META[activePdfTool];
+      const htmlUrl = (document.getElementById('pdf-html-url')?.value || '').trim();
+      if (!pdfSelectedFiles.length && !(meta.optionalFile && htmlUrl)) {
+        showToast(meta.optionalFile ? 'Upload an .html file or enter a URL first' : 'Please select a file first', 'warning');
+        return;
+      }
+      if ((activePdfTool === 'merge' || activePdfTool === 'compare') && pdfSelectedFiles.length < 2) {
+        showToast(`Select at least 2 PDF files for ${meta.title}`, 'warning');
+        return;
+      }
 
       const runBtn = document.getElementById('pdf-run-btn');
       const cancelBtn = document.getElementById('pdf-cancel-btn');
@@ -1931,25 +2252,31 @@
       pdfResultInfo.textContent = 'Starting local process...';
       updateSettingsProgress({
         active: true,
-        title: `Running: ${PDF_TOOLS_META[activePdfTool].title}`,
-        detail: `Processing ${pdfSelectedFiles.length} file${pdfSelectedFiles.length > 1 ? 's' : ''} locally...`,
+        title: `Running: ${meta.title}`,
+        detail: `Processing locally...`,
         pct: 100,
-        counts: `0/${pdfSelectedFiles.length}`,
+        counts: `0/${Math.max(1, pdfSelectedFiles.length)}`,
         indeterminate: true
       });
 
-      const supportsLivePages = ['ocr-pdf', 'to-images', 'compress', 'to-markdown'].includes(activePdfTool);
+      const supportsLivePages = [
+        'ocr-pdf', 'to-images', 'compress', 'to-markdown', 'watermark', 'page-numbers',
+        'crop', 'redact', 'repair', 'organize', 'sign', 'compare', 'to-word', 'to-pptx',
+        'to-excel', 'word-to-pdf', 'pptx-to-pdf', 'excel-to-pdf', 'html-to-pdf',
+        'pdf-to-pdfa', 'ai-summarize', 'workflow'
+      ].includes(activePdfTool);
+
       if (supportsLivePages) {
         startJobProgressPolling(jobId, (p) => {
           if (p.total > 0) {
-            const label = p.detail || `Page ${p.current} of ${p.total}`;
+            const label = p.detail || `Step ${p.current} of ${p.total}`;
             pdfResultInfo.textContent = `${label} (${p.pct}%)`;
             updateSettingsProgress({
               active: true,
-              title: `Running: ${PDF_TOOLS_META[activePdfTool].title}`,
+              title: `Running: ${meta.title}`,
               detail: label,
               pct: p.pct,
-              counts: `${p.current}/${p.total} pages`,
+              counts: `${p.current}/${p.total}`,
               indeterminate: false
             });
           } else if (p.detail) {
@@ -1960,15 +2287,14 @@
 
       try {
         const fd = new FormData();
-        if (activePdfTool === 'merge' || activePdfTool === 'from-images') {
+        const multiFieldTools = ['merge', 'from-images', 'compare', 'workflow'];
+        if (multiFieldTools.includes(activePdfTool)) {
           pdfSelectedFiles.forEach(f => fd.append('files', f));
-        } else {
+        } else if (pdfSelectedFiles[0]) {
           fd.append('file', pdfSelectedFiles[0]);
         }
 
-        if (supportsLivePages) {
-          fd.append('job_id', jobId);
-        }
+        if (supportsLivePages) fd.append('job_id', jobId);
 
         if (activePdfTool === 'split') {
           fd.append('pages', document.getElementById('pdf-split-pages').value);
@@ -1977,14 +2303,65 @@
           const rmPages = document.getElementById('pdf-remove-pages-input').value.trim();
           if (!rmPages) throw new Error('Enter the page numbers to remove (e.g. 2, 4-5).');
           fd.append('pages', rmPages);
+        } else if (activePdfTool === 'organize') {
+          const ord = document.getElementById('pdf-organize-order').value.trim();
+          if (!ord) throw new Error('Enter the desired page order (e.g. 3, 1, 2 or reverse).');
+          fd.append('order', ord);
         } else if (activePdfTool === 'rotate') {
           fd.append('angle', document.getElementById('pdf-rotate-angle').value);
           fd.append('pages', document.getElementById('pdf-rotate-pages').value);
+        } else if (activePdfTool === 'crop') {
+          fd.append('top', document.getElementById('pdf-crop-top').value || '0');
+          fd.append('right', document.getElementById('pdf-crop-right').value || '0');
+          fd.append('bottom', document.getElementById('pdf-crop-bottom').value || '0');
+          fd.append('left', document.getElementById('pdf-crop-left').value || '0');
+          fd.append('unit', document.getElementById('pdf-crop-unit').value);
+          fd.append('pages', document.getElementById('pdf-crop-pages').value);
+        } else if (activePdfTool === 'watermark') {
+          fd.append('text', document.getElementById('pdf-wm-text').value || 'CONFIDENTIAL');
+          fd.append('opacity', document.getElementById('pdf-wm-opacity').value);
+          fd.append('angle', document.getElementById('pdf-wm-angle').value);
+          fd.append('font_size', document.getElementById('pdf-wm-size').value || '44');
+          fd.append('position', document.getElementById('pdf-wm-pos').value);
+        } else if (activePdfTool === 'page-numbers') {
+          fd.append('position', document.getElementById('pdf-pn-pos').value);
+          fd.append('fmt', document.getElementById('pdf-pn-fmt').value);
+          fd.append('start_num', document.getElementById('pdf-pn-start').value || '1');
+          fd.append('font_size', document.getElementById('pdf-pn-size').value || '11');
+        } else if (activePdfTool === 'sign') {
+          if (!sigHasDrawn) throw new Error('Please draw your signature on the pad first.');
+          const canvas = document.getElementById('pdf-sign-canvas');
+          fd.append('signature_data', canvas.toDataURL('image/png'));
+          fd.append('page_num', document.getElementById('pdf-sign-page').value || 'last');
+          fd.append('position', document.getElementById('pdf-sign-pos').value);
+          fd.append('width_pct', document.getElementById('pdf-sign-width').value || '24');
+        } else if (activePdfTool === 'redact') {
+          const terms = document.getElementById('pdf-redact-terms').value.trim();
+          if (!terms) throw new Error('Enter at least one word or phrase to redact.');
+          fd.append('terms', terms);
+        } else if (activePdfTool === 'html-to-pdf') {
+          if (htmlUrl) fd.append('url', htmlUrl);
+        } else if (activePdfTool === 'to-pptx') {
+          fd.append('dpi', document.getElementById('pdf-pptx-dpi').value);
         } else if (activePdfTool === 'to-images') {
           fd.append('img_format', document.getElementById('pdf-img-format').value);
           fd.append('dpi', document.getElementById('pdf-img-dpi').value);
         } else if (activePdfTool === 'ocr-pdf') {
           fd.append('ocr_mode', document.getElementById('pdf-ocr-mode').value);
+        } else if (activePdfTool === 'ai-summarize') {
+          fd.append('style', document.getElementById('pdf-ai-style').value);
+          fd.append('llm_base_url', settings.llmBaseUrl || '');
+          fd.append('llm_model', settings.llmModel || '');
+          fd.append('llm_api_key', settings.llmApiKey || '');
+        } else if (activePdfTool === 'workflow') {
+          const cfg = {
+            rotate_angle: Number(document.getElementById('wf-rotate').value || 0),
+            watermark_text: document.getElementById('wf-watermark').value.trim(),
+            add_page_numbers: document.getElementById('wf-page-numbers').checked,
+            compress: document.getElementById('wf-compress').checked,
+            password: document.getElementById('wf-password').value
+          };
+          fd.append('config', JSON.stringify(cfg));
         } else if (activePdfTool === 'protect' || activePdfTool === 'unlock') {
           fd.append('password', document.getElementById('pdf-password-input').value);
         }
@@ -2004,6 +2381,14 @@
         const match = disp.match(/filename="([^"]+)"/);
         const filename = match ? match[1] : `local-folio_${activePdfTool}.pdf`;
 
+        // Preview AI Summary directly inside workspace as well as downloading
+        if (activePdfTool === 'ai-summarize') {
+          const mdText = await blob.text();
+          const prev = document.getElementById('pdf-ai-preview');
+          prev.innerHTML = marked.parse(mdText);
+          prev.classList.remove('hidden');
+        }
+
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
         link.download = filename;
@@ -2014,30 +2399,37 @@
         const pageCount = Number(res.headers.get('X-Page-Count') || 0);
         const ocrPages = res.headers.get('X-OCR-Pages');
         const digitalPages = res.headers.get('X-Digital-Pages');
+        const redactCount = res.headers.get('X-Redaction-Count');
+        const diffAdded = res.headers.get('X-Diff-Added');
+        const diffRemoved = res.headers.get('X-Diff-Removed');
 
         if (orig && comp) {
           const saved = Math.max(0, Math.round((1 - comp / orig) * 100));
           pdfResultInfo.textContent = `Downloaded ${filename} (${formatBytes(orig)} -> ${formatBytes(comp)}, -${saved}%)`;
         } else if (ocrPages !== null && digitalPages !== null && pageCount) {
           pdfResultInfo.textContent = `Downloaded ${filename} (${pageCount} pages: ${digitalPages} digital, ${ocrPages} OCR)`;
+        } else if (redactCount !== null) {
+          pdfResultInfo.textContent = `Downloaded ${filename} (${redactCount} redactions applied)`;
+        } else if (diffAdded !== null && diffRemoved !== null) {
+          pdfResultInfo.textContent = `Downloaded ${filename} (+${diffAdded} / -${diffRemoved} lines changed)`;
         } else {
           pdfResultInfo.textContent = `Downloaded ${filename} (${formatBytes(blob.size)})`;
         }
         showToast(`Saved successfully: ${filename}`, 'success');
         updateSettingsProgress({
           active: false,
-          title: `Completed: ${PDF_TOOLS_META[activePdfTool].title}`,
+          title: `Completed: ${meta.title}`,
           detail: `Downloaded ${filename}`,
           pct: 100,
-          counts: pageCount ? `${pageCount}/${pageCount} pages` : `${pdfSelectedFiles.length}/${pdfSelectedFiles.length}`
+          counts: pageCount ? `${pageCount}/${pageCount} pages` : '1/1'
         });
       } catch (err) {
         if (err.name === 'AbortError' || cancelledByUser) {
           pdfResultInfo.textContent = 'Cancelled by user';
-          showToast(`${PDF_TOOLS_META[activePdfTool].title} cancelled`, 'warning');
+          showToast(`${meta.title} cancelled`, 'warning');
           updateSettingsProgress({
             active: false,
-            title: `Cancelled: ${PDF_TOOLS_META[activePdfTool].title}`,
+            title: `Cancelled: ${meta.title}`,
             detail: 'Stopped by user',
             pct: 0,
             counts: '0/0'
@@ -2047,10 +2439,10 @@
           showToast(err.message, 'error');
           updateSettingsProgress({
             active: false,
-            title: `Failed: ${PDF_TOOLS_META[activePdfTool].title}`,
+            title: `Failed: ${meta.title}`,
             detail: err.message || 'Processing failed',
             pct: 0,
-            counts: `0/${pdfSelectedFiles.length}`
+            counts: `0/${Math.max(1, pdfSelectedFiles.length)}`
           });
         }
       } finally {
@@ -2062,6 +2454,83 @@
         runBtn.disabled = false;
         cancelBtn.classList.add('hidden');
       }
+    }
+
+    // ── Global Feature Search Command Palette (Center Header Magnifying Glass) ─
+    let searchFilteredItems = [];
+    let searchActiveIdx = 0;
+
+    function getAllSearchableFeatures() {
+      const core = [
+        { id: 'view:convert', title: 'MarkItDown Converter', desc: 'Unlimited batch document & URL-to-Markdown conversion with RapidOCR fallback.', cat: 'Main Workspace', icon: 'file-code-2', kw: 'markdown url docx pdf batch konversi', action: () => switchMainView('convert') },
+        { id: 'view:ocr', title: 'Batch Image & Photo OCR', desc: 'Extract clean text from dozens of photos or scanned PDFs with auto-rotation.', cat: 'Main Workspace', icon: 'scan-text', kw: 'image foto ocr gambar batch teks', action: () => switchMainView('ocr') }
+      ];
+      const pdfItems = Object.entries(PDF_TOOLS_META).map(([id, m]) => ({
+        id: `pdf:${id}`,
+        title: m.title,
+        desc: m.desc,
+        cat: PDF_CAT_LABELS[m.cat] || 'PDF Tools',
+        icon: m.icon,
+        kw: `${m.kw || ''} ${m.accept || ''} pdf`,
+        action: () => { switchMainView('pdf'); selectPdfTool(id, true); }
+      }));
+      return [...core, ...pdfItems];
+    }
+
+    function openFeatureSearch() {
+      const modal = document.getElementById('feature-search-modal');
+      const input = document.getElementById('feature-search-input');
+      modal.classList.remove('hidden');
+      input.value = '';
+      searchActiveIdx = 0;
+      renderFeatureSearchResults('');
+      setTimeout(() => input.focus(), 10);
+    }
+
+    function closeFeatureSearch() {
+      document.getElementById('feature-search-modal').classList.add('hidden');
+    }
+
+    function renderFeatureSearchResults(query) {
+      const container = document.getElementById('feature-search-results');
+      const countEl = document.getElementById('feature-search-count');
+      const q = (query || '').toLowerCase().trim();
+      const all = getAllSearchableFeatures();
+      searchFilteredItems = q
+        ? all.filter(it => `${it.title} ${it.desc} ${it.cat} ${it.kw}`.toLowerCase().includes(q))
+        : all;
+      if (searchActiveIdx >= searchFilteredItems.length) searchActiveIdx = 0;
+      countEl.textContent = `${searchFilteredItems.length} tool${searchFilteredItems.length === 1 ? '' : 's'}`;
+      container.innerHTML = '';
+
+      if (!searchFilteredItems.length) {
+        container.innerHTML = '<div class="p-6 text-center text-xs text-[var(--ink-muted)]">No matching tools found.</div>';
+        return;
+      }
+
+      searchFilteredItems.forEach((item, idx) => {
+        const active = idx === searchActiveIdx;
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = `w-full text-left px-3.5 py-2.5 rounded-xl flex items-center gap-3 transition-colors ${
+          active ? 'bg-[var(--accent-soft)] border border-[var(--accent)]' : 'border border-transparent hover:bg-[var(--bg-elevated)]'
+        }`;
+        row.innerHTML = `
+          <div class="w-9 h-9 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--accent)] shrink-0">
+            <i data-lucide="${item.icon}" class="w-4 h-4"></i>
+          </div>
+          <div class="min-w-0 flex-grow">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-semibold text-[var(--ink-primary)] truncate">${escapeHtml(item.title)}</span>
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded-md bg-[var(--bg-elevated)] text-[var(--ink-muted)] shrink-0">${escapeHtml(item.cat)}</span>
+            </div>
+            <p class="text-[11px] text-[var(--ink-muted)] truncate mt-0.5">${escapeHtml(item.desc)}</p>
+          </div>`;
+        row.addEventListener('mouseenter', () => { searchActiveIdx = idx; });
+        row.addEventListener('click', () => { closeFeatureSearch(); item.action(); });
+        container.appendChild(row);
+      });
+      refreshIcons();
     }
 
     // ── Full-Tab (100% Viewport) Drag & Drop Controller ──────────────────────
@@ -2127,8 +2596,45 @@
     function setupEvents() {
       setupGlobalDragAndDrop();
 
-      document.querySelectorAll('.t-expanding-tab').forEach(btn => {
+      document.querySelectorAll('.t-expanding-tab[data-view]').forEach(btn => {
         btn.addEventListener('click', () => switchMainView(btn.dataset.view));
+      });
+
+      // Center Header Search Bar (Magnifying Glass + Ctrl+K)
+      const searchModal = document.getElementById('feature-search-modal');
+      const searchInput = document.getElementById('feature-search-input');
+      document.getElementById('open-search-btn').addEventListener('click', openFeatureSearch);
+      searchModal.addEventListener('click', e => { if (e.target === searchModal) closeFeatureSearch(); });
+      searchInput.addEventListener('input', e => { searchActiveIdx = 0; renderFeatureSearchResults(e.target.value); });
+      searchInput.addEventListener('keydown', e => {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (searchFilteredItems.length) {
+            searchActiveIdx = (searchActiveIdx + 1) % searchFilteredItems.length;
+            renderFeatureSearchResults(searchInput.value);
+          }
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (searchFilteredItems.length) {
+            searchActiveIdx = (searchActiveIdx - 1 + searchFilteredItems.length) % searchFilteredItems.length;
+            renderFeatureSearchResults(searchInput.value);
+          }
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          const chosen = searchFilteredItems[searchActiveIdx];
+          if (chosen) { closeFeatureSearch(); chosen.action(); }
+        } else if (e.key === 'Escape') {
+          closeFeatureSearch();
+        }
+      });
+      document.addEventListener('keydown', e => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+          e.preventDefault();
+          if (searchModal.classList.contains('hidden')) openFeatureSearch();
+          else closeFeatureSearch();
+        } else if (e.key === 'Escape' && !searchModal.classList.contains('hidden')) {
+          closeFeatureSearch();
+        }
       });
 
       // Convert view
@@ -2217,8 +2723,17 @@
       });
 
       // PDF Toolkit view (iLovePDF Directory + Focused Workspace)
+      renderPdfToolDirectory();
+      setupSignatureCanvas();
       document.querySelectorAll('.pdf-cat-pill').forEach(btn => btn.addEventListener('click', () => filterPdfCategory(btn.dataset.pdfCat)));
-      document.querySelectorAll('.pdf-tool-card').forEach(btn => btn.addEventListener('click', () => selectPdfTool(btn.dataset.pdfTool, true)));
+      document.getElementById('pdf-organize-reverse-btn').addEventListener('click', () => {
+        if (organizeThumbItems.length) {
+          organizeThumbItems.reverse();
+          renderOrganizeThumbs();
+        } else {
+          document.getElementById('pdf-organize-order').value = 'reverse';
+        }
+      });
       document.getElementById('pdf-back-directory-btn').addEventListener('click', showPdfDirectory);
       pdfDropZone.addEventListener('click', () => pdfToolInput.click());
       pdfDropZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pdfToolInput.click(); } });
