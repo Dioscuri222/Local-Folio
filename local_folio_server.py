@@ -566,28 +566,72 @@ async def ocr_extract(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.post("/api/pdf/merge")
-async def pdf_merge(files: List[UploadFile] = File(...)):
+async def pdf_merge(
+    files: List[UploadFile] = File(...),
+    add_bookmarks: bool = Form(True),
+    page_size: str = Form("keep"),  # "keep" | "a4" | "letter"
+    job_id: Optional[str] = Form(None),
+):
     if len(files) < 2:
         raise HTTPException(status_code=400, detail="Upload at least 2 PDF files to merge.")
-    writer = PdfWriter()
+    raw_items = [(f.filename or f"file_{i + 1}.pdf", await f.read()) for i, f in enumerate(files)]
+
+    def _run():
+        import pymupdf
+
+        _job_init(job_id, total=len(raw_items), detail=f"Merging {len(raw_items)} PDF files...")
+        out_doc = pymupdf.open()
+        toc = []
+        size_map = {"a4": (595.28, 841.89), "letter": (612.0, 792.0)}
+        target_dims = size_map.get(page_size.lower())
+
+        try:
+            for idx, (fname, data) in enumerate(raw_items, start=1):
+                _job_update(job_id, idx - 1, len(raw_items), f"Adding {fname} ({idx}/{len(raw_items)})...")
+                src = pymupdf.open(stream=data, filetype="pdf")
+                try:
+                    start_page = len(out_doc) + 1
+                    if target_dims:
+                        tw, th = target_dims
+                        for p_i in range(len(src)):
+                            sr = src[p_i].rect
+                            # Keep each page's orientation when normalizing page size
+                            pw, ph = (th, tw) if sr.width > sr.height else (tw, th)
+                            new_p = out_doc.new_page(width=pw, height=ph)
+                            new_p.show_pdf_page(new_p.rect, src, p_i, keep_proportion=True)
+                    else:
+                        out_doc.insert_pdf(src)
+                    if add_bookmarks and len(src) > 0:
+                        toc.append([1, Path(fname).stem, start_page])
+                finally:
+                    src.close()
+                _job_update(job_id, idx, len(raw_items), f"Added {fname} ({idx}/{len(raw_items)})")
+
+            if add_bookmarks and toc:
+                out_doc.set_toc(toc)
+            total_pages = len(out_doc)
+            out_bytes = out_doc.tobytes(deflate=True)
+        finally:
+            out_doc.close()
+
+        _job_finish(job_id, "done", f"Merged {len(raw_items)} files ({total_pages} pages)")
+        return out_bytes, total_pages
+
     try:
-        for f in files:
-            data = await f.read()
-            reader = PdfReader(io.BytesIO(data))
-            for page in reader.pages:
-                writer.add_page(page)
-        out = io.BytesIO()
-        writer.write(out)
-        out.seek(0)
+        out_bytes, total_pages = await asyncio.to_thread(_run)
         return StreamingResponse(
-            out,
+            io.BytesIO(out_bytes),
             media_type="application/pdf",
             headers={
                 "Content-Disposition": 'attachment; filename="local-folio_merged.pdf"',
-                "X-Page-Count": str(len(writer.pages)),
+                "X-Page-Count": str(total_pages),
             },
         )
+    except JobCancelledError as exc:
+        _job_finish(job_id, "cancelled", str(exc))
+        raise HTTPException(status_code=499, detail=str(exc))
     except Exception as exc:
+        _job_finish(job_id, "error", str(exc))
         raise HTTPException(status_code=500, detail=str(exc))
 
 
@@ -682,21 +726,25 @@ async def pdf_rotate(
 @app.post("/api/pdf/compress")
 async def pdf_compress(
     file: UploadFile = File(...),
+    level: str = Form("recommended"),  # "low" | "recommended" | "extreme"
     job_id: Optional[str] = Form(None),
 ):
     raw = await file.read()
     orig_size = len(raw)
     stem = Path(file.filename or "document").stem
+    lvl = level.lower()
+    quality = 88 if lvl == "low" else 45 if lvl == "extreme" else 72
+    max_dim = 2400 if lvl == "low" else 1100 if lvl == "extreme" else 1600
 
     def _run():
         reader = PdfReader(io.BytesIO(raw))
         total = len(reader.pages)
-        _job_init(job_id, total=total, detail=f"Preparing {total} pages...")
+        _job_init(job_id, total=total, detail=f"Preparing {total} pages ({lvl} compression)...")
         writer = PdfWriter()
         for page in reader.pages:
             writer.add_page(page)
         for idx, page in enumerate(writer.pages, start=1):
-            _job_update(job_id, idx - 1, total, f"Compressing page {idx} of {total}...")
+            _job_update(job_id, idx - 1, total, f"Compressing page {idx} of {total} ({lvl})...")
             try:
                 page.compress_content_streams()
             except Exception:
@@ -706,7 +754,12 @@ async def pdf_compress(
                 try:
                     pil_img = img_file.image
                     if pil_img is not None:
-                        img_file.replace(pil_img.convert("RGB"), quality=72)
+                        rgb = pil_img.convert("RGB")
+                        w, h = rgb.size
+                        if max(w, h) > max_dim:
+                            scale = max_dim / float(max(w, h))
+                            rgb = rgb.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.Resampling.LANCZOS)
+                        img_file.replace(rgb, quality=quality)
                 except Exception:
                     pass
             _job_update(job_id, idx, total, f"Compressed page {idx} of {total}")
@@ -718,7 +771,7 @@ async def pdf_compress(
         out = io.BytesIO()
         writer.write(out)
         compressed_bytes = out.getvalue()
-        _job_finish(job_id, "done", f"Compressed {total} pages")
+        _job_finish(job_id, "done", f"Compressed {total} pages ({lvl})")
         return compressed_bytes
 
     try:
@@ -745,6 +798,7 @@ async def pdf_to_images(
     file: UploadFile = File(...),
     img_format: str = Form("jpeg"),  # "jpeg" | "png"
     dpi: int = Form(150),
+    pages: str = Form(""),
     job_id: Optional[str] = Form(None),
 ):
     raw = await file.read()
@@ -754,23 +808,34 @@ async def pdf_to_images(
     scale = max(1.0, min(4.0, dpi / 72.0))
 
     def _run():
-        _job_init(job_id, total=0, detail="Opening PDF...")
-        zip_buf = io.BytesIO()
-        total_pages = 0
-        with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
-            for page_num, total, img in iter_pdf_pages_pil(raw, scale=scale):
-                total_pages = total
-                _job_update(job_id, page_num - 1, total, f"Rendering page {page_num} of {total} ({dpi} DPI)...")
-                buf = io.BytesIO()
-                if fmt == "JPEG":
-                    img.convert("RGB").save(buf, format="JPEG", quality=90)
-                else:
-                    img.save(buf, format="PNG")
-                zf.writestr(f"{stem}_page_{page_num}.{ext}", buf.getvalue())
-                _job_update(job_id, page_num, total, f"Rendered page {page_num} of {total}")
+        doc = pdfium.PdfDocument(raw)
+        try:
+            total = len(doc)
+            indices = parse_page_ranges(pages, total) if pages.strip() else list(range(total))
+            if not indices:
+                raise ValueError(f"No valid pages in range (PDF has {total} pages).")
+            _job_init(job_id, total=len(indices), detail=f"Rendering {len(indices)} page(s)...")
+            zip_buf = io.BytesIO()
+            with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                for step_i, idx in enumerate(indices, start=1):
+                    _job_update(job_id, step_i - 1, len(indices), f"Rendering page {idx + 1} ({step_i}/{len(indices)}, {dpi} DPI)...")
+                    page = doc[idx]
+                    try:
+                        img = page.render(scale=scale).to_pil()
+                    finally:
+                        page.close()
+                    buf = io.BytesIO()
+                    if fmt == "JPEG":
+                        img.convert("RGB").save(buf, format="JPEG", quality=90)
+                    else:
+                        img.save(buf, format="PNG")
+                    zf.writestr(f"{stem}_page_{idx + 1}.{ext}", buf.getvalue())
+                    _job_update(job_id, step_i, len(indices), f"Rendered page {idx + 1} ({step_i}/{len(indices)})")
+        finally:
+            doc.close()
         zip_buf.seek(0)
-        _job_finish(job_id, "done", f"Rendered {total_pages} pages")
-        return zip_buf, total_pages
+        _job_finish(job_id, "done", f"Rendered {len(indices)} pages")
+        return zip_buf, len(indices)
 
     try:
         zip_buf, total_pages = await asyncio.to_thread(_run)
@@ -787,31 +852,101 @@ async def pdf_to_images(
         raise HTTPException(status_code=499, detail=str(exc))
     except Exception as exc:
         _job_finish(job_id, "error", str(exc))
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=400 if isinstance(exc, ValueError) else 500, detail=str(exc))
 
 
 @app.post("/api/pdf/from-images")
-async def pdf_from_images(files: List[UploadFile] = File(...)):
+async def pdf_from_images(
+    files: List[UploadFile] = File(...),
+    orientation: str = Form("portrait"),  # "portrait" | "landscape"
+    page_size: str = Form("a4"),          # "fit" | "a4" | "letter"
+    margin: str = Form("none"),           # "none" | "small" | "big"
+    merge_all: bool = Form(True),
+    job_id: Optional[str] = Form(None),
+):
     if not files:
         raise HTTPException(status_code=400, detail="Upload at least 1 image file.")
+    raw_items = [(f.filename or f"image_{i + 1}.jpg", await f.read()) for i, f in enumerate(files)]
+
+    def _add_image_page(doc, img_bytes: bytes):
+        import pymupdf
+
+        im = ImageOps.exif_transpose(Image.open(io.BytesIO(img_bytes))).convert("RGB")
+        iw, ih = im.size
+        buf = io.BytesIO()
+        im.save(buf, format="JPEG", quality=92)
+        clean_bytes = buf.getvalue()
+
+        # Margin in PDF points (1 mm = 72 / 25.4 pt)
+        margin_pt = 0.0 if margin == "none" else (28.35 if margin == "small" else 70.87)  # 0mm / 10mm / 25mm
+
+        ps = page_size.lower()
+        if ps == "fit":
+            # Match image aspect ratio at 72 pt/in (or 96 dpi -> 0.75 scale) + optional margin
+            pw = max(72.0, iw * 0.75) + margin_pt * 2
+            ph = max(72.0, ih * 0.75) + margin_pt * 2
+            if orientation == "landscape" and ph > pw:
+                pw, ph = ph, pw
+            elif orientation == "portrait" and pw > ph:
+                pw, ph = ph, pw
+        else:
+            base_w, base_h = (612.0, 792.0) if ps == "letter" else (595.28, 841.89)  # US Letter or A4
+            pw, ph = (base_h, base_w) if orientation == "landscape" else (base_w, base_h)
+
+        page = doc.new_page(width=pw, height=ph)
+        inner = pymupdf.Rect(margin_pt, margin_pt, max(margin_pt + 10, pw - margin_pt), max(margin_pt + 10, ph - margin_pt))
+        page.insert_image(inner, stream=clean_bytes, keep_proportion=True)
+
+    def _run():
+        import pymupdf
+
+        total = len(raw_items)
+        _job_init(job_id, total=total, detail=f"Converting {total} image(s) to PDF...")
+
+        if merge_all or total == 1:
+            doc = pymupdf.open()
+            try:
+                for idx, (fname, data) in enumerate(raw_items, start=1):
+                    _job_update(job_id, idx - 1, total, f"Placing {fname} ({idx}/{total})...")
+                    _add_image_page(doc, data)
+                    _job_update(job_id, idx, total, f"Added {fname} ({idx}/{total})")
+                out_bytes = doc.tobytes(deflate=True)
+            finally:
+                doc.close()
+            _job_finish(job_id, "done", f"Created PDF from {total} image(s)")
+            return out_bytes, "application/pdf", "local-folio_images.pdf", total
+
+        # Separate 1-page PDF per image inside a .ZIP archive
+        zip_buf = io.BytesIO()
+        with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for idx, (fname, data) in enumerate(raw_items, start=1):
+                _job_update(job_id, idx - 1, total, f"Creating PDF for {fname} ({idx}/{total})...")
+                single = pymupdf.open()
+                try:
+                    _add_image_page(single, data)
+                    zf.writestr(f"{Path(fname).stem}_{idx}.pdf", single.tobytes(deflate=True))
+                finally:
+                    single.close()
+                _job_update(job_id, idx, total, f"Created PDF {idx}/{total}")
+        zip_buf.seek(0)
+        _job_finish(job_id, "done", f"Created {total} separate PDFs (.ZIP)")
+        return zip_buf.getvalue(), "application/zip", "local-folio_images_pdfs.zip", total
+
     try:
-        pil_images: List[Image.Image] = []
-        for f in files:
-            data = await f.read()
-            im = ImageOps.exif_transpose(Image.open(io.BytesIO(data))).convert("RGB")
-            pil_images.append(im)
-        out = io.BytesIO()
-        pil_images[0].save(out, format="PDF", save_all=True, append_images=pil_images[1:])
-        out.seek(0)
+        out_bytes, media_type, out_name, count = await asyncio.to_thread(_run)
         return StreamingResponse(
-            out,
-            media_type="application/pdf",
+            io.BytesIO(out_bytes),
+            media_type=media_type,
             headers={
-                "Content-Disposition": 'attachment; filename="local-folio_images.pdf"',
-                "X-Page-Count": str(len(pil_images)),
+                "Content-Disposition": f'attachment; filename="{out_name}"',
+                "X-Page-Count": str(count),
             },
         )
+    except JobCancelledError as exc:
+        _job_finish(job_id, "cancelled", str(exc))
+        raise HTTPException(status_code=499, detail=str(exc))
     except Exception as exc:
+        _job_finish(job_id, "error", str(exc))
         raise HTTPException(status_code=500, detail=str(exc))
 
 
@@ -855,26 +990,39 @@ async def pdf_remove_pages(
 async def pdf_protect(
     file: UploadFile = File(...),
     password: str = Form(...),
+    allow_print: bool = Form(True),
+    allow_copy: bool = Form(True),
 ):
     if not password.strip():
         raise HTTPException(status_code=400, detail="Password cannot be empty.")
     raw = await file.read()
     stem = Path(file.filename or "document").stem
     try:
-        reader = PdfReader(io.BytesIO(raw))
-        writer = PdfWriter()
-        for page in reader.pages:
-            writer.add_page(page)
-        writer.encrypt(password)
-        out = io.BytesIO()
-        writer.write(out)
-        out.seek(0)
+        import pymupdf
+
+        doc = pymupdf.open(stream=raw, filetype="pdf")
+        try:
+            perms = pymupdf.PDF_PERM_ACCESSIBILITY
+            if allow_print:
+                perms |= pymupdf.PDF_PERM_PRINT | pymupdf.PDF_PERM_PRINT_HQ
+            if allow_copy:
+                perms |= pymupdf.PDF_PERM_COPY
+            out_bytes = doc.tobytes(
+                encryption=pymupdf.PDF_ENCRYPT_AES_256,
+                user_pw=password,
+                owner_pw=password,
+                permissions=perms,
+                deflate=True,
+            )
+            page_count = len(doc)
+        finally:
+            doc.close()
         return StreamingResponse(
-            out,
+            io.BytesIO(out_bytes),
             media_type="application/pdf",
             headers={
                 "Content-Disposition": f'attachment; filename="{stem}_protected.pdf"',
-                "X-Page-Count": str(len(writer.pages)),
+                "X-Page-Count": str(page_count),
             },
         )
     except Exception as exc:
@@ -917,13 +1065,17 @@ async def pdf_unlock(
 @app.post("/api/pdf/to-markdown")
 async def pdf_to_markdown(
     file: UploadFile = File(...),
+    enable_frontmatter: bool = Form(False),
+    enable_ocr: bool = Form(True),
     job_id: Optional[str] = Form(None),
 ):
     raw = await file.read()
-    stem = Path(file.filename or "document").stem
+    filename = file.filename or "document.pdf"
+    stem = Path(filename).stem
 
     def _run():
         _job_init(job_id, total=0, detail=f"Converting {stem}.pdf to Markdown...")
+        method = "Microsoft MarkItDown"
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir) / "input.pdf"
             tmp_path.write_bytes(raw)
@@ -931,7 +1083,8 @@ async def pdf_to_markdown(
             result = md_engine.convert(str(tmp_path))
             text = (result.text_content or "").strip()
 
-        if not text:
+        if not text and enable_ocr:
+            method = "RapidOCR (PDF Scan)"
             sections = []
             for page_num, total, page_img in iter_pdf_pages_pil(raw, scale=1.5):
                 _job_update(job_id, page_num - 1, total, f"Scanned PDF — OCR page {page_num} of {total}...")
@@ -939,6 +1092,9 @@ async def pdf_to_markdown(
                 sections.append(f"## Page {page_num}\n\n{p_txt}" if total > 1 else p_txt)
                 _job_update(job_id, page_num, total, f"Scanned PDF — OCR page {page_num} of {total}")
             text = f"# {stem}\n\n" + "\n\n".join(sections)
+
+        if enable_frontmatter:
+            text = build_frontmatter(filename, len(raw), "application/pdf", method) + text
 
         _job_finish(job_id, "done", f"Converted {stem}.pdf to Markdown")
         return text

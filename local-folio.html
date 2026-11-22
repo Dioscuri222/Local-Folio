@@ -218,6 +218,30 @@
       box-shadow: var(--shadow-card);
     }
 
+    .opt-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 12px 10px;
+      border-radius: 12px;
+      background-color: var(--bg-elevated);
+      border: 1.5px solid var(--border-hairline);
+      color: var(--ink-secondary);
+      cursor: pointer;
+      transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+    }
+    .opt-tile:hover {
+      border-color: var(--border-strong);
+      color: var(--ink-primary);
+    }
+    .opt-tile[aria-pressed="true"] {
+      background-color: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
     .cafe-aura {
       background:
         radial-gradient(620px 320px at 50% 40%, var(--accent-soft), transparent 72%),
@@ -671,6 +695,92 @@
 
         <div id="pdf-file-list" class="hidden space-y-2 max-h-56 overflow-y-auto"></div>
 
+        <!-- Merge Options -->
+        <div id="pdf-options-merge" class="hidden space-y-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label for="pdf-merge-size" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Page size normalization</label>
+              <select id="pdf-merge-size" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+                <option value="keep">Keep original page sizes</option>
+                <option value="a4">Normalize all pages to A4 (210 × 297 mm)</option>
+                <option value="letter">Normalize all pages to US Letter (215.9 × 279.4 mm)</option>
+              </select>
+            </div>
+            <label class="flex items-center gap-2.5 px-3.5 py-2.5 self-end min-h-[42px] rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] cursor-pointer text-xs">
+              <input id="pdf-merge-bookmarks" type="checkbox" checked class="w-4 h-4 accent-[var(--accent)]" />
+              <span class="text-[var(--ink-primary)] font-medium">Add filename bookmarks (TOC)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Compress PDF Options (Visual Compression Level Tiles) -->
+        <div id="pdf-options-compress" class="hidden space-y-2.5">
+          <span class="block text-xs font-medium text-[var(--ink-secondary)]">Compression level</span>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5" data-opt-group="compress-level">
+            <button type="button" class="opt-tile text-center" data-opt-val="low" aria-pressed="false">
+              <span class="text-xs font-bold">Less Compression</span>
+              <span class="text-[11px] opacity-80">High quality, lighter reduction</span>
+            </button>
+            <button type="button" class="opt-tile text-center" data-opt-val="recommended" aria-pressed="true">
+              <span class="text-xs font-bold">Recommended</span>
+              <span class="text-[11px] opacity-80">Best balance of size &amp; clarity</span>
+            </button>
+            <button type="button" class="opt-tile text-center" data-opt-val="extreme" aria-pressed="false">
+              <span class="text-xs font-bold">Extreme</span>
+              <span class="text-[11px] opacity-80">Smallest file size, lower DPI</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- JPG / PNG to PDF Options (iLovePDF-Style Layout in Cafe Theme) -->
+        <div id="pdf-options-from-images" class="hidden space-y-4">
+          <div class="space-y-1.5">
+            <span class="block text-xs font-medium text-[var(--ink-secondary)]">Page orientation</span>
+            <div class="grid grid-cols-2 gap-3" data-opt-group="img2pdf-orientation">
+              <button type="button" class="opt-tile" data-opt-val="portrait" aria-pressed="true">
+                <span class="w-5 h-7 rounded-[3px] border-2 border-current block"></span>
+                <span class="text-xs font-semibold">Portrait</span>
+              </button>
+              <button type="button" class="opt-tile" data-opt-val="landscape" aria-pressed="false">
+                <span class="w-7 h-5 rounded-[3px] border-2 border-current block my-1"></span>
+                <span class="text-xs font-semibold">Landscape</span>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label for="pdf-from-img-size" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Page size</label>
+            <select id="pdf-from-img-size" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+              <option value="fit">Fit (Same page size as image)</option>
+              <option value="a4" selected>A4 (297×210 mm)</option>
+              <option value="letter">US Letter (215×279.4 mm)</option>
+            </select>
+          </div>
+
+          <div class="space-y-1.5">
+            <span class="block text-xs font-medium text-[var(--ink-secondary)]">Margin</span>
+            <div class="grid grid-cols-3 gap-2.5" data-opt-group="img2pdf-margin">
+              <button type="button" class="opt-tile" data-opt-val="none" aria-pressed="true">
+                <i data-lucide="image" class="w-5 h-5"></i>
+                <span class="text-xs font-semibold">No margin</span>
+              </button>
+              <button type="button" class="opt-tile" data-opt-val="small" aria-pressed="false">
+                <i data-lucide="square-dashed" class="w-5 h-5"></i>
+                <span class="text-xs font-semibold">Small (10 mm)</span>
+              </button>
+              <button type="button" class="opt-tile" data-opt-val="big" aria-pressed="false">
+                <i data-lucide="frame" class="w-5 h-5"></i>
+                <span class="text-xs font-semibold">Big (25 mm)</span>
+              </button>
+            </div>
+          </div>
+
+          <label class="flex items-center gap-2.5 p-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] cursor-pointer text-xs">
+            <input id="pdf-from-img-merge" type="checkbox" checked class="w-4 h-4 accent-[var(--accent)]" />
+            <span class="text-[var(--ink-primary)] font-medium">Merge all images in one PDF file (uncheck to export separate PDFs as .ZIP)</span>
+          </label>
+        </div>
+
         <!-- Split Options -->
         <div id="pdf-options-split" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
@@ -709,7 +819,7 @@
         </div>
 
         <!-- To Images Options -->
-        <div id="pdf-options-to-images" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div id="pdf-options-to-images" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label for="pdf-img-format" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Image format</label>
             <select id="pdf-img-format" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
@@ -724,6 +834,10 @@
               <option value="200">200 DPI (Sharp)</option>
               <option value="300">300 DPI (Print Quality)</option>
             </select>
+          </div>
+          <div>
+            <label for="pdf-img-pages" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Page range (optional)</label>
+            <input id="pdf-img-pages" type="text" placeholder="All if blank (e.g. 1-5)" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] font-mono" />
           </div>
         </div>
 
@@ -883,24 +997,157 @@
         </div>
 
         <!-- Redact PDF Options -->
-        <div id="pdf-options-redact" class="hidden">
-          <label for="pdf-redact-terms" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Words or phrases to permanently redact (comma or line separated)</label>
-          <textarea id="pdf-redact-terms" rows="3" placeholder="e.g. John Doe, 123-45-6789, Confidential" class="w-full p-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] font-mono"></textarea>
+        <div id="pdf-options-redact" class="hidden space-y-3">
+          <div>
+            <label for="pdf-redact-terms" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Words or phrases to permanently redact (comma or line separated)</label>
+            <textarea id="pdf-redact-terms" rows="3" placeholder="e.g. John Doe, 123-45-6789, Confidential" class="w-full p-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] font-mono"></textarea>
+          </div>
+          <div>
+            <label for="pdf-redact-color" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Redaction box fill</label>
+            <select id="pdf-redact-color" class="w-full min-h-[40px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+              <option value="black">Solid Black</option>
+              <option value="brown">Espresso Brown</option>
+              <option value="white">White (Invisible removal)</option>
+            </select>
+          </div>
         </div>
 
-        <!-- HTML to PDF Options -->
-        <div id="pdf-options-html-to-pdf" class="hidden">
-          <label for="pdf-html-url" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Web URL (optional — or drop an .html file above)</label>
-          <input id="pdf-html-url" type="url" placeholder="https://example.com" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] font-mono" />
+        <!-- HTML to PDF Options (URL + Page Layout) -->
+        <div id="pdf-options-html-to-pdf" class="hidden space-y-3.5">
+          <div>
+            <label for="pdf-html-url" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Web URL (optional — or drop an .html file above)</label>
+            <input id="pdf-html-url" type="url" placeholder="https://example.com" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] font-mono" />
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div>
+              <label for="pdf-html-orientation" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Orientation</label>
+              <select id="pdf-html-orientation" class="w-full min-h-[40px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+                <option value="portrait">Portrait</option>
+                <option value="landscape">Landscape</option>
+              </select>
+            </div>
+            <div>
+              <label for="pdf-html-size" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Page size</label>
+              <select id="pdf-html-size" class="w-full min-h-[40px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+                <option value="a4">A4 (210×297 mm)</option>
+                <option value="letter">US Letter (215×279.4 mm)</option>
+              </select>
+            </div>
+            <div>
+              <label for="pdf-html-margin" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Margin</label>
+              <select id="pdf-html-margin" class="w-full min-h-[40px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+                <option value="none">No margin</option>
+                <option value="small" selected>Small (10 mm)</option>
+                <option value="big">Big (25 mm)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- To Word Options -->
+        <div id="pdf-options-to-word" class="hidden">
+          <label for="pdf-word-pages" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Page range (leave blank for all pages)</label>
+          <input id="pdf-word-pages" type="text" placeholder="e.g. 1-5, 8" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] font-mono" />
         </div>
 
         <!-- To PPTX Options -->
-        <div id="pdf-options-to-pptx" class="hidden">
-          <label for="pdf-pptx-dpi" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Slide Resolution (DPI)</label>
-          <select id="pdf-pptx-dpi" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
-            <option value="150">150 DPI (Standard)</option>
-            <option value="200">200 DPI (Sharp)</option>
+        <div id="pdf-options-to-pptx" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label for="pdf-pptx-size" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Slide aspect ratio</label>
+            <select id="pdf-pptx-size" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+              <option value="match">Match PDF aspect ratio</option>
+              <option value="16:9">Widescreen 16:9</option>
+              <option value="4:3">Standard 4:3</option>
+            </select>
+          </div>
+          <div>
+            <label for="pdf-pptx-dpi" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Slide Resolution (DPI)</label>
+            <select id="pdf-pptx-dpi" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+              <option value="150">150 DPI (Standard)</option>
+              <option value="200">200 DPI (Sharp)</option>
+            </select>
+          </div>
+          <div>
+            <label for="pdf-pptx-pages" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Page range (optional)</label>
+            <input id="pdf-pptx-pages" type="text" placeholder="All if blank (e.g. 1-10)" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)] font-mono" />
+          </div>
+        </div>
+
+        <!-- To Excel Options -->
+        <div id="pdf-options-to-excel" class="hidden">
+          <label for="pdf-excel-sheet-mode" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Worksheet layout</label>
+          <select id="pdf-excel-sheet-mode" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+            <option value="per_page">One worksheet per PDF page</option>
+            <option value="single">Merge all extracted tables into one sheet</option>
           </select>
+        </div>
+
+        <!-- To Markdown Options -->
+        <div id="pdf-options-to-markdown" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <label class="flex items-center gap-2.5 p-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] cursor-pointer">
+            <input id="pdf-md-frontmatter" type="checkbox" class="w-4 h-4 accent-[var(--accent)]" />
+            <span class="text-[var(--ink-primary)] font-medium">Include YAML frontmatter</span>
+          </label>
+          <label class="flex items-center gap-2.5 p-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] cursor-pointer">
+            <input id="pdf-md-ocr" type="checkbox" checked class="w-4 h-4 accent-[var(--accent)]" />
+            <span class="text-[var(--ink-primary)] font-medium">Auto RapidOCR for scanned pages</span>
+          </label>
+        </div>
+
+        <!-- PDF to PDF/A Options -->
+        <div id="pdf-options-pdf-to-pdfa" class="hidden">
+          <label for="pdf-pdfa-conformance" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Archival conformance level</label>
+          <select id="pdf-pdfa-conformance" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+            <option value="2b" selected>PDF/A-2b (Recommended — modern ISO archival)</option>
+            <option value="1b">PDF/A-1b (Strict legacy compatibility)</option>
+            <option value="3b">PDF/A-3b (Supports embedded attachments)</option>
+          </select>
+        </div>
+
+        <!-- Repair PDF Options -->
+        <div id="pdf-options-repair" class="hidden">
+          <label for="pdf-repair-mode" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Repair mode</label>
+          <select id="pdf-repair-mode" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+            <option value="standard">Standard — Rebuild xref &amp; metadata (pikepdf)</option>
+            <option value="deep">Deep Clean — Garbage-collect &amp; re-compress streams (PyMuPDF)</option>
+          </select>
+        </div>
+
+        <!-- Compare PDF Options -->
+        <div id="pdf-options-compare" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <label class="flex items-center gap-2.5 p-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] cursor-pointer">
+            <input id="pdf-cmp-whitespace" type="checkbox" checked class="w-4 h-4 accent-[var(--accent)]" />
+            <span class="text-[var(--ink-primary)] font-medium">Ignore extra whitespace &amp; blank lines</span>
+          </label>
+          <label class="flex items-center gap-2.5 p-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] cursor-pointer">
+            <input id="pdf-cmp-case" type="checkbox" class="w-4 h-4 accent-[var(--accent)]" />
+            <span class="text-[var(--ink-primary)] font-medium">Case-insensitive text comparison</span>
+          </label>
+        </div>
+
+        <!-- Office to PDF Options (Word / PowerPoint / Excel) -->
+        <div id="pdf-options-office" class="hidden space-y-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label for="pdf-office-quality" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Export quality</label>
+              <select id="pdf-office-quality" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+                <option value="standard">Standard (Publishing &amp; Print)</option>
+                <option value="minimal">Minimum Size (Web &amp; Sharing)</option>
+              </select>
+            </div>
+            <div id="pdf-office-excel-orient-wrap" class="hidden">
+              <label for="pdf-excel-orientation" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">Sheet page orientation</label>
+              <select id="pdf-excel-orientation" class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]">
+                <option value="auto">Auto (Workbook default)</option>
+                <option value="portrait">Portrait</option>
+                <option value="landscape">Landscape</option>
+              </select>
+            </div>
+          </div>
+          <label id="pdf-office-excel-fit-wrap" class="hidden flex items-center gap-2.5 p-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] cursor-pointer text-xs">
+            <input id="pdf-excel-fit-cols" type="checkbox" checked class="w-4 h-4 accent-[var(--accent)]" />
+            <span class="text-[var(--ink-primary)] font-medium">Fit all columns on one page wide</span>
+          </label>
         </div>
 
         <!-- AI Summarizer Options -->
@@ -950,9 +1197,21 @@
         </div>
 
         <!-- Password Options (Protect / Unlock) -->
-        <div id="pdf-options-password" class="hidden">
-          <label for="pdf-password-input" id="pdf-password-label" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">PDF Password</label>
-          <input id="pdf-password-input" type="password" placeholder="Enter password..." class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]" />
+        <div id="pdf-options-password" class="hidden space-y-3">
+          <div>
+            <label for="pdf-password-input" id="pdf-password-label" class="block text-xs font-medium text-[var(--ink-secondary)] mb-1">PDF Password</label>
+            <input id="pdf-password-input" type="password" placeholder="Enter password..." class="w-full min-h-[42px] px-3 text-xs rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-primary)]" />
+          </div>
+          <div id="pdf-protect-perms" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+            <label class="flex items-center gap-2.5 p-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] cursor-pointer">
+              <input id="pdf-protect-print" type="checkbox" checked class="w-4 h-4 accent-[var(--accent)]" />
+              <span class="text-[var(--ink-primary)] font-medium">Allow printing</span>
+            </label>
+            <label class="flex items-center gap-2.5 p-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] cursor-pointer">
+              <input id="pdf-protect-copy" type="checkbox" checked class="w-4 h-4 accent-[var(--accent)]" />
+              <span class="text-[var(--ink-primary)] font-medium">Allow copying text</span>
+            </label>
+          </div>
         </div>
 
         <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[var(--border-hairline)]">
@@ -2152,6 +2411,21 @@
       });
     }
 
+    function getOptTileValue(groupName, fallback) {
+      const active = document.querySelector(`[data-opt-group="${groupName}"] .opt-tile[aria-pressed="true"]`);
+      return active ? active.dataset.optVal : fallback;
+    }
+
+    function setupOptTiles() {
+      document.querySelectorAll('[data-opt-group]').forEach(group => {
+        group.querySelectorAll('.opt-tile').forEach(btn => {
+          btn.addEventListener('click', () => {
+            group.querySelectorAll('.opt-tile').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+          });
+        });
+      });
+    }
+
     function selectPdfTool(toolId, openWorkspace = true) {
       activePdfTool = toolId;
       pdfSelectedFiles = [];
@@ -2169,19 +2443,27 @@
       pdfResultInfo.textContent = 'Ready to process';
 
       const optionIds = [
-        'split', 'remove-pages', 'rotate', 'to-images', 'ocr-pdf',
-        'organize', 'crop', 'watermark', 'page-numbers', 'sign',
-        'redact', 'html-to-pdf', 'to-pptx', 'ai-summarize', 'workflow'
+        'merge', 'compress', 'from-images', 'split', 'remove-pages', 'rotate',
+        'to-images', 'ocr-pdf', 'organize', 'crop', 'watermark', 'page-numbers',
+        'sign', 'redact', 'html-to-pdf', 'to-word', 'to-pptx', 'to-excel',
+        'to-markdown', 'pdf-to-pdfa', 'repair', 'compare', 'ai-summarize', 'workflow'
       ];
       optionIds.forEach(opt => {
         const el = document.getElementById(`pdf-options-${opt}`);
         if (el) el.classList.toggle('hidden', toolId !== opt);
       });
+
+      const isOffice = ['word-to-pdf', 'pptx-to-pdf', 'excel-to-pdf'].includes(toolId);
+      document.getElementById('pdf-options-office').classList.toggle('hidden', !isOffice);
+      document.getElementById('pdf-office-excel-orient-wrap').classList.toggle('hidden', toolId !== 'excel-to-pdf');
+      document.getElementById('pdf-office-excel-fit-wrap').classList.toggle('hidden', toolId !== 'excel-to-pdf');
+
       document.getElementById('pdf-organize-thumbs').classList.add('hidden');
       document.getElementById('pdf-ai-preview').classList.add('hidden');
 
       const needsPassword = toolId === 'protect' || toolId === 'unlock';
       document.getElementById('pdf-options-password').classList.toggle('hidden', !needsPassword);
+      document.getElementById('pdf-protect-perms').classList.toggle('hidden', toolId !== 'protect');
       if (needsPassword) {
         document.getElementById('pdf-password-label').textContent = toolId === 'protect' ? 'New password to protect PDF' : 'Current password to unlock PDF';
         document.getElementById('pdf-password-input').value = '';
@@ -2213,13 +2495,27 @@
     function renderPdfFileList() {
       pdfFileList.innerHTML = '';
       pdfFileList.classList.toggle('hidden', pdfSelectedFiles.length === 0);
+      const multi = pdfSelectedFiles.length > 1;
       pdfSelectedFiles.forEach((f, idx) => {
         const row = document.createElement('div');
         row.className = 'flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-xs';
-        row.innerHTML = `<span class="truncate text-[var(--ink-primary)] font-mono">${idx + 1}. ${escapeHtml(f.name)} (${formatBytes(f.size)})</span><button type="button" data-idx="${idx}" class="text-[var(--ink-muted)] hover:text-[var(--crimson)] font-medium">Remove</button>`;
-        row.querySelector('button').addEventListener('click', () => {
-          pdfSelectedFiles.splice(idx, 1);
-          renderPdfFileList();
+        row.innerHTML = `
+          <span class="truncate text-[var(--ink-primary)] font-mono">${idx + 1}. ${escapeHtml(f.name)} (${formatBytes(f.size)})</span>
+          <div class="flex items-center gap-1.5 shrink-0">
+            ${multi ? `<button type="button" data-op="up" class="px-1.5 py-0.5 rounded-md bg-[var(--bg-panel)] border border-[var(--border-hairline)] text-[var(--ink-secondary)] hover:text-[var(--accent)]" title="Move up">↑</button><button type="button" data-op="down" class="px-1.5 py-0.5 rounded-md bg-[var(--bg-panel)] border border-[var(--border-hairline)] text-[var(--ink-secondary)] hover:text-[var(--accent)]" title="Move down">↓</button>` : ''}
+            <button type="button" data-op="rm" class="text-[var(--ink-muted)] hover:text-[var(--crimson)] font-medium pl-1">Remove</button>
+          </div>`;
+        row.querySelectorAll('button').forEach(b => {
+          b.addEventListener('click', () => {
+            if (b.dataset.op === 'up' && idx > 0) {
+              [pdfSelectedFiles[idx - 1], pdfSelectedFiles[idx]] = [pdfSelectedFiles[idx], pdfSelectedFiles[idx - 1]];
+            } else if (b.dataset.op === 'down' && idx < pdfSelectedFiles.length - 1) {
+              [pdfSelectedFiles[idx + 1], pdfSelectedFiles[idx]] = [pdfSelectedFiles[idx], pdfSelectedFiles[idx + 1]];
+            } else if (b.dataset.op === 'rm') {
+              pdfSelectedFiles.splice(idx, 1);
+            }
+            renderPdfFileList();
+          });
         });
         pdfFileList.appendChild(row);
       });
@@ -2260,7 +2556,7 @@
       });
 
       const supportsLivePages = [
-        'ocr-pdf', 'to-images', 'compress', 'to-markdown', 'watermark', 'page-numbers',
+        'merge', 'from-images', 'ocr-pdf', 'to-images', 'compress', 'to-markdown', 'watermark', 'page-numbers',
         'crop', 'redact', 'repair', 'organize', 'sign', 'compare', 'to-word', 'to-pptx',
         'to-excel', 'word-to-pdf', 'pptx-to-pdf', 'excel-to-pdf', 'html-to-pdf',
         'pdf-to-pdfa', 'ai-summarize', 'workflow'
@@ -2296,7 +2592,17 @@
 
         if (supportsLivePages) fd.append('job_id', jobId);
 
-        if (activePdfTool === 'split') {
+        if (activePdfTool === 'merge') {
+          fd.append('page_size', document.getElementById('pdf-merge-size').value);
+          fd.append('add_bookmarks', String(document.getElementById('pdf-merge-bookmarks').checked));
+        } else if (activePdfTool === 'compress') {
+          fd.append('level', getOptTileValue('compress-level', 'recommended'));
+        } else if (activePdfTool === 'from-images') {
+          fd.append('orientation', getOptTileValue('img2pdf-orientation', 'portrait'));
+          fd.append('page_size', document.getElementById('pdf-from-img-size').value);
+          fd.append('margin', getOptTileValue('img2pdf-margin', 'none'));
+          fd.append('merge_all', String(document.getElementById('pdf-from-img-merge').checked));
+        } else if (activePdfTool === 'split') {
           fd.append('pages', document.getElementById('pdf-split-pages').value);
           fd.append('mode', document.getElementById('pdf-split-mode').value);
         } else if (activePdfTool === 'remove-pages') {
@@ -2339,13 +2645,40 @@
           const terms = document.getElementById('pdf-redact-terms').value.trim();
           if (!terms) throw new Error('Enter at least one word or phrase to redact.');
           fd.append('terms', terms);
+          fd.append('fill_color', document.getElementById('pdf-redact-color').value);
         } else if (activePdfTool === 'html-to-pdf') {
           if (htmlUrl) fd.append('url', htmlUrl);
+          fd.append('orientation', document.getElementById('pdf-html-orientation').value);
+          fd.append('page_size', document.getElementById('pdf-html-size').value);
+          fd.append('margin', document.getElementById('pdf-html-margin').value);
+        } else if (activePdfTool === 'to-word') {
+          fd.append('pages', document.getElementById('pdf-word-pages').value);
         } else if (activePdfTool === 'to-pptx') {
           fd.append('dpi', document.getElementById('pdf-pptx-dpi').value);
+          fd.append('slide_size', document.getElementById('pdf-pptx-size').value);
+          fd.append('pages', document.getElementById('pdf-pptx-pages').value);
+        } else if (activePdfTool === 'to-excel') {
+          fd.append('sheet_mode', document.getElementById('pdf-excel-sheet-mode').value);
+        } else if (activePdfTool === 'to-markdown') {
+          fd.append('enable_frontmatter', String(document.getElementById('pdf-md-frontmatter').checked));
+          fd.append('enable_ocr', String(document.getElementById('pdf-md-ocr').checked));
+        } else if (activePdfTool === 'pdf-to-pdfa') {
+          fd.append('conformance', document.getElementById('pdf-pdfa-conformance').value);
+        } else if (activePdfTool === 'repair') {
+          fd.append('mode', document.getElementById('pdf-repair-mode').value);
+        } else if (activePdfTool === 'compare') {
+          fd.append('ignore_whitespace', String(document.getElementById('pdf-cmp-whitespace').checked));
+          fd.append('ignore_case', String(document.getElementById('pdf-cmp-case').checked));
+        } else if (activePdfTool === 'word-to-pdf' || activePdfTool === 'pptx-to-pdf') {
+          fd.append('quality', document.getElementById('pdf-office-quality').value);
+        } else if (activePdfTool === 'excel-to-pdf') {
+          fd.append('quality', document.getElementById('pdf-office-quality').value);
+          fd.append('orientation', document.getElementById('pdf-excel-orientation').value);
+          fd.append('fit_columns', String(document.getElementById('pdf-excel-fit-cols').checked));
         } else if (activePdfTool === 'to-images') {
           fd.append('img_format', document.getElementById('pdf-img-format').value);
           fd.append('dpi', document.getElementById('pdf-img-dpi').value);
+          fd.append('pages', document.getElementById('pdf-img-pages').value);
         } else if (activePdfTool === 'ocr-pdf') {
           fd.append('ocr_mode', document.getElementById('pdf-ocr-mode').value);
         } else if (activePdfTool === 'ai-summarize') {
@@ -2362,7 +2695,11 @@
             password: document.getElementById('wf-password').value
           };
           fd.append('config', JSON.stringify(cfg));
-        } else if (activePdfTool === 'protect' || activePdfTool === 'unlock') {
+        } else if (activePdfTool === 'protect') {
+          fd.append('password', document.getElementById('pdf-password-input').value);
+          fd.append('allow_print', String(document.getElementById('pdf-protect-print').checked));
+          fd.append('allow_copy', String(document.getElementById('pdf-protect-copy').checked));
+        } else if (activePdfTool === 'unlock') {
           fd.append('password', document.getElementById('pdf-password-input').value);
         }
 
@@ -2724,6 +3061,7 @@
 
       // PDF Toolkit view (iLovePDF Directory + Focused Workspace)
       renderPdfToolDirectory();
+      setupOptTiles();
       setupSignatureCanvas();
       document.querySelectorAll('.pdf-cat-pill').forEach(btn => btn.addEventListener('click', () => filterPdfCategory(btn.dataset.pdfCat)));
       document.getElementById('pdf-organize-reverse-btn').addEventListener('click', () => {

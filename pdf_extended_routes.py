@@ -60,7 +60,14 @@ def _find_gs_binary() -> Optional[str]:
     return None
 
 
-def _convert_office_to_pdf_sync(input_path: Path, output_path: Path, app_type: str) -> None:
+def _convert_office_to_pdf_sync(
+    input_path: Path,
+    output_path: Path,
+    app_type: str,
+    quality: str = "standard",
+    orientation: str = "auto",
+    fit_columns: bool = False,
+) -> None:
     """Convert Word/Excel/PowerPoint to PDF via Windows MS Office COM or LibreOffice headless."""
     # 1. Try native Microsoft Office COM on Windows (highest fidelity)
     if os.name == "nt":
@@ -79,7 +86,8 @@ def _convert_office_to_pdf_sync(input_path: Path, output_path: Path, app_type: s
                     try:
                         doc = word.Documents.Open(in_str, ReadOnly=True)
                         try:
-                            doc.ExportAsFixedFormat(out_str, 17)  # 17 = wdExportFormatPDF
+                            opt_for = 1 if quality == "minimal" else 0  # 0=Print, 1=OnScreen
+                            doc.ExportAsFixedFormat(out_str, 17, False, opt_for)
                         finally:
                             doc.Close(False)
                     finally:
@@ -93,7 +101,18 @@ def _convert_office_to_pdf_sync(input_path: Path, output_path: Path, app_type: s
                     try:
                         wb = excel.Workbooks.Open(in_str, ReadOnly=True)
                         try:
-                            wb.ExportAsFixedFormat(0, out_str)  # 0 = xlTypePDF
+                            if orientation in ("portrait", "landscape") or fit_columns:
+                                for ws in wb.Worksheets:
+                                    if orientation == "portrait":
+                                        ws.PageSetup.Orientation = 1  # xlPortrait
+                                    elif orientation == "landscape":
+                                        ws.PageSetup.Orientation = 2  # xlLandscape
+                                    if fit_columns:
+                                        ws.PageSetup.Zoom = False
+                                        ws.PageSetup.FitToPagesWide = 1
+                                        ws.PageSetup.FitToPagesTall = False
+                            xl_quality = 1 if quality == "minimal" else 0
+                            wb.ExportAsFixedFormat(0, out_str, xl_quality)
                         finally:
                             wb.Close(False)
                     finally:
@@ -417,6 +436,7 @@ def build_extended_pdf_router(
     async def pdf_redact(
         file: UploadFile = File(...),
         terms: str = Form(...),
+        fill_color: str = Form("black"),  # "black" | "brown" | "white"
         job_id: Optional[str] = Form(None),
     ):
         raw = await file.read()
@@ -424,6 +444,8 @@ def build_extended_pdf_router(
         term_list = [t.strip() for part in terms.splitlines() for t in part.split(",") if t.strip()]
         if not term_list:
             raise HTTPException(status_code=400, detail="Enter at least one word or phrase to redact.")
+        color_map = {"black": (0, 0, 0), "brown": (0.28, 0.17, 0.11), "white": (1, 1, 1)}
+        rgb = color_map.get(fill_color.lower(), (0, 0, 0))
 
         def _run():
             doc = pymupdf.open(stream=raw, filetype="pdf")
@@ -437,7 +459,7 @@ def build_extended_pdf_router(
                     for term in term_list:
                         rects = page.search_for(term)
                         for rect in rects:
-                            page.add_redact_annot(rect, fill=(0, 0, 0))
+                            page.add_redact_annot(rect, fill=rgb)
                             page_hits += 1
                     if page_hits > 0:
                         page.apply_redactions()
@@ -471,6 +493,7 @@ def build_extended_pdf_router(
     @router.post("/api/pdf/repair")
     async def pdf_repair(
         file: UploadFile = File(...),
+        mode: str = Form("standard"),  # "standard" | "deep"
         job_id: Optional[str] = Form(None),
     ):
         raw = await file.read()
@@ -478,21 +501,30 @@ def build_extended_pdf_router(
 
         def _run():
             job_init(job_id, total=2, detail="Rebuilding PDF xref & object streams...")
-            try:
-                with pikepdf.open(io.BytesIO(raw)) as pdf:
-                    total = len(pdf.pages)
-                    job_update(job_id, 1, 2, f"Validating {total} pages with pikepdf...")
-                    buf = io.BytesIO()
-                    pdf.save(buf, linearize=False, fix_metadata_version=True)
-                    out = buf.getvalue()
-            except Exception:
+            if mode == "deep":
                 doc = pymupdf.open(stream=raw, filetype="pdf")
                 try:
                     total = len(doc)
-                    job_update(job_id, 1, 2, f"Reconstructing {total} pages with PyMuPDF...")
+                    job_update(job_id, 1, 2, f"Deep-cleaning {total} pages with PyMuPDF...")
                     out = doc.tobytes(garbage=4, deflate=True, clean=True)
                 finally:
                     doc.close()
+            else:
+                try:
+                    with pikepdf.open(io.BytesIO(raw)) as pdf:
+                        total = len(pdf.pages)
+                        job_update(job_id, 1, 2, f"Validating {total} pages with pikepdf...")
+                        buf = io.BytesIO()
+                        pdf.save(buf, linearize=False, fix_metadata_version=True)
+                        out = buf.getvalue()
+                except Exception:
+                    doc = pymupdf.open(stream=raw, filetype="pdf")
+                    try:
+                        total = len(doc)
+                        job_update(job_id, 1, 2, f"Reconstructing {total} pages with PyMuPDF...")
+                        out = doc.tobytes(garbage=4, deflate=True, clean=True)
+                    finally:
+                        doc.close()
             job_finish(job_id, "done", f"Repaired {total} pages cleanly")
             return out, total
 
@@ -692,6 +724,8 @@ def build_extended_pdf_router(
     @router.post("/api/pdf/compare")
     async def pdf_compare(
         files: List[UploadFile] = File(...),
+        ignore_whitespace: bool = Form(True),
+        ignore_case: bool = Form(False),
         job_id: Optional[str] = Form(None),
     ):
         if len(files) < 2:
@@ -700,6 +734,17 @@ def build_extended_pdf_router(
         raw_b = await files[1].read()
         name_a = files[0].filename or "original.pdf"
         name_b = files[1].filename or "modified.pdf"
+
+        def _norm(lines: List[str]) -> List[str]:
+            out = []
+            for ln in lines:
+                s = " ".join(ln.split()) if ignore_whitespace else ln
+                if ignore_whitespace and not s:
+                    continue
+                if ignore_case:
+                    s = s.lower()
+                out.append(s)
+            return out
 
         def _run():
             doc_a = pymupdf.open(stream=raw_a, filetype="pdf")
@@ -711,8 +756,8 @@ def build_extended_pdf_router(
                 lines_b: List[str] = []
                 for i in range(max_pages):
                     job_update(job_id, i, max_pages, f"Reading page {i + 1} of {max_pages}...")
-                    ta = doc_a[i].get_text("text").splitlines() if i < len(doc_a) else []
-                    tb = doc_b[i].get_text("text").splitlines() if i < len(doc_b) else []
+                    ta = _norm(doc_a[i].get_text("text").splitlines()) if i < len(doc_a) else []
+                    tb = _norm(doc_b[i].get_text("text").splitlines()) if i < len(doc_b) else []
                     lines_a.append(f"=== Page {i + 1} ===")
                     lines_a.extend(ta)
                     lines_b.append(f"=== Page {i + 1} ===")
@@ -759,6 +804,7 @@ def build_extended_pdf_router(
     @router.post("/api/pdf/to-word")
     async def pdf_to_word(
         file: UploadFile = File(...),
+        pages: str = Form(""),
         job_id: Optional[str] = Form(None),
     ):
         raw = await file.read()
@@ -774,14 +820,19 @@ def build_extended_pdf_router(
                 doc_check = pymupdf.open(str(in_pdf))
                 total = len(doc_check)
                 doc_check.close()
-                job_init(job_id, total=total, detail=f"Converting {total} pages to Word (.docx)...")
+                selected = parse_page_ranges(pages, total) if pages.strip() else None
+                count = len(selected) if selected else total
+                job_init(job_id, total=count, detail=f"Converting {count} page(s) to Word (.docx)...")
                 cv = Converter(str(in_pdf))
                 try:
-                    cv.convert(str(out_docx), start=0, end=None)
+                    if selected:
+                        cv.convert(str(out_docx), pages=selected)
+                    else:
+                        cv.convert(str(out_docx), start=0, end=None)
                 finally:
                     cv.close()
-                job_finish(job_id, "done", f"Converted {total} pages to Word")
-                return out_docx.read_bytes(), total
+                job_finish(job_id, "done", f"Converted {count} pages to Word")
+                return out_docx.read_bytes(), count
 
         try:
             data, total = await asyncio.to_thread(_run)
@@ -805,6 +856,8 @@ def build_extended_pdf_router(
     async def pdf_to_pptx(
         file: UploadFile = File(...),
         dpi: int = Form(150),
+        slide_size: str = Form("match"),  # "match" | "16:9" | "4:3"
+        pages: str = Form(""),
         job_id: Optional[str] = Form(None),
     ):
         raw = await file.read()
@@ -812,27 +865,61 @@ def build_extended_pdf_router(
         scale = max(1.0, min(3.0, dpi / 72.0))
 
         def _run():
+            import pypdfium2 as pdfium
+
             prs = Presentation()
             blank_layout = prs.slide_layouts[6]
-            total_pages = 0
-            job_init(job_id, total=0, detail="Opening PDF for PowerPoint slides...")
-            for page_num, total, img in iter_pdf_pages_pil(raw, scale=scale):
-                total_pages = total
-                job_update(job_id, page_num - 1, total, f"Creating slide {page_num} of {total}...")
-                if page_num == 1:
-                    prs.slide_width = Inches(10.0)
-                    prs.slide_height = Inches(10.0 * (img.height / max(1, img.width)))
-                slide = prs.slides.add_slide(blank_layout)
-                img_buf = io.BytesIO()
-                img.convert("RGB").save(img_buf, format="JPEG", quality=90)
-                img_buf.seek(0)
-                slide.shapes.add_picture(img_buf, 0, 0, width=prs.slide_width, height=prs.slide_height)
-                job_update(job_id, page_num, total, f"Created slide {page_num} of {total}")
+            if slide_size == "16:9":
+                prs.slide_width = Inches(13.333)
+                prs.slide_height = Inches(7.5)
+            elif slide_size == "4:3":
+                prs.slide_width = Inches(10.0)
+                prs.slide_height = Inches(7.5)
+
+            doc = pdfium.PdfDocument(raw)
+            try:
+                total = len(doc)
+                indices = parse_page_ranges(pages, total) if pages.strip() else list(range(total))
+                if not indices:
+                    raise ValueError(f"No valid pages in range (PDF has {total} pages).")
+                job_init(job_id, total=len(indices), detail=f"Creating {len(indices)} PowerPoint slide(s)...")
+                for step_i, idx in enumerate(indices, start=1):
+                    job_update(job_id, step_i - 1, len(indices), f"Creating slide {step_i} of {len(indices)}...")
+                    page = doc[idx]
+                    try:
+                        img = page.render(scale=scale).to_pil()
+                    finally:
+                        page.close()
+                    if step_i == 1 and slide_size == "match":
+                        prs.slide_width = Inches(10.0)
+                        prs.slide_height = Inches(10.0 * (img.height / max(1, img.width)))
+
+                    slide = prs.slides.add_slide(blank_layout)
+                    img_buf = io.BytesIO()
+                    img.convert("RGB").save(img_buf, format="JPEG", quality=90)
+                    img_buf.seek(0)
+
+                    # Fit proportionally centered inside slide
+                    sw, sh = prs.slide_width, prs.slide_height
+                    img_ratio = img.width / max(1, img.height)
+                    slide_ratio = sw / max(1, sh)
+                    if img_ratio > slide_ratio:
+                        pw = sw
+                        ph = int(sw / img_ratio)
+                        left_pos, top_pos = 0, int((sh - ph) / 2)
+                    else:
+                        ph = sh
+                        pw = int(sh * img_ratio)
+                        left_pos, top_pos = int((sw - pw) / 2), 0
+                    slide.shapes.add_picture(img_buf, left_pos, top_pos, width=pw, height=ph)
+                    job_update(job_id, step_i, len(indices), f"Created slide {step_i} of {len(indices)}")
+            finally:
+                doc.close()
 
             out_buf = io.BytesIO()
             prs.save(out_buf)
-            job_finish(job_id, "done", f"Created {total_pages} slides")
-            return out_buf.getvalue(), total_pages
+            job_finish(job_id, "done", f"Created {len(indices)} slides")
+            return out_buf.getvalue(), len(indices)
 
         try:
             data, total_pages = await asyncio.to_thread(_run)
@@ -849,12 +936,13 @@ def build_extended_pdf_router(
             raise HTTPException(status_code=499, detail=str(exc))
         except Exception as exc:
             job_finish(job_id, "error", str(exc))
-            raise HTTPException(status_code=500, detail=str(exc))
+            raise HTTPException(status_code=400 if isinstance(exc, ValueError) else 500, detail=str(exc))
 
     # ── 11. PDF to Excel (.xlsx) ──────────────────────────────────────────────
     @router.post("/api/pdf/to-excel")
     async def pdf_to_excel(
         file: UploadFile = File(...),
+        sheet_mode: str = Form("per_page"),  # "per_page" | "single"
         job_id: Optional[str] = Form(None),
     ):
         raw = await file.read()
@@ -864,16 +952,25 @@ def build_extended_pdf_router(
             wb = Workbook()
             ws_default = wb.active
             used_default = False
+            if sheet_mode == "single":
+                ws_default.title = "Extracted_Tables"
+                used_default = True
             with pdfplumber.open(io.BytesIO(raw)) as pdf:
                 total = len(pdf.pages)
                 job_init(job_id, total=total, detail=f"Extracting tables from {total} pages...")
                 for idx, page in enumerate(pdf.pages, start=1):
                     job_update(job_id, idx - 1, total, f"Scanning page {idx} of {total} for tables...")
                     tables = page.extract_tables() or []
-                    ws = ws_default if not used_default else wb.create_sheet(title=f"Page_{idx}")
-                    if not used_default:
-                        ws.title = f"Page_{idx}"
-                        used_default = True
+                    if sheet_mode == "single":
+                        ws = ws_default
+                        if idx > 1:
+                            ws.append([])
+                        ws.append([f"--- Page {idx} ---"])
+                    else:
+                        ws = ws_default if not used_default else wb.create_sheet(title=f"Page_{idx}")
+                        if not used_default:
+                            ws.title = f"Page_{idx}"
+                            used_default = True
                     if tables:
                         for t_idx, table in enumerate(tables):
                             if t_idx > 0:
@@ -909,7 +1006,14 @@ def build_extended_pdf_router(
             raise HTTPException(status_code=500, detail=str(exc))
 
     # ── 12–14. Word / PowerPoint / Excel to PDF ───────────────────────────────
-    async def _handle_office_to_pdf(file: UploadFile, app_type: str, job_id: Optional[str]):
+    async def _handle_office_to_pdf(
+        file: UploadFile,
+        app_type: str,
+        job_id: Optional[str],
+        quality: str = "standard",
+        orientation: str = "auto",
+        fit_columns: bool = False,
+    ):
         raw = await file.read()
         orig_name = file.filename or f"document.{app_type}"
         stem = Path(orig_name).stem
@@ -922,7 +1026,14 @@ def build_extended_pdf_router(
                 out_path = Path(tmp_dir) / f"{stem}.pdf"
                 in_path.write_bytes(raw)
                 job_update(job_id, 1, 2, f"Rendering {orig_name} to PDF...")
-                _convert_office_to_pdf_sync(in_path, out_path, app_type)
+                _convert_office_to_pdf_sync(
+                    in_path,
+                    out_path,
+                    app_type,
+                    quality=quality,
+                    orientation=orientation,
+                    fit_columns=fit_columns,
+                )
                 pdf_bytes = out_path.read_bytes()
             job_finish(job_id, "done", f"Converted {orig_name} to PDF")
             return pdf_bytes
@@ -942,22 +1053,41 @@ def build_extended_pdf_router(
             raise HTTPException(status_code=500, detail=str(exc))
 
     @router.post("/api/pdf/word-to-pdf")
-    async def word_to_pdf(file: UploadFile = File(...), job_id: Optional[str] = Form(None)):
-        return await _handle_office_to_pdf(file, "word", job_id)
+    async def word_to_pdf(
+        file: UploadFile = File(...),
+        quality: str = Form("standard"),
+        job_id: Optional[str] = Form(None),
+    ):
+        return await _handle_office_to_pdf(file, "word", job_id, quality=quality)
 
     @router.post("/api/pdf/pptx-to-pdf")
-    async def pptx_to_pdf(file: UploadFile = File(...), job_id: Optional[str] = Form(None)):
-        return await _handle_office_to_pdf(file, "powerpoint", job_id)
+    async def pptx_to_pdf(
+        file: UploadFile = File(...),
+        quality: str = Form("standard"),
+        job_id: Optional[str] = Form(None),
+    ):
+        return await _handle_office_to_pdf(file, "powerpoint", job_id, quality=quality)
 
     @router.post("/api/pdf/excel-to-pdf")
-    async def excel_to_pdf(file: UploadFile = File(...), job_id: Optional[str] = Form(None)):
-        return await _handle_office_to_pdf(file, "excel", job_id)
+    async def excel_to_pdf(
+        file: UploadFile = File(...),
+        orientation: str = Form("auto"),
+        fit_columns: bool = Form(True),
+        quality: str = Form("standard"),
+        job_id: Optional[str] = Form(None),
+    ):
+        return await _handle_office_to_pdf(
+            file, "excel", job_id, quality=quality, orientation=orientation, fit_columns=fit_columns
+        )
 
     # ── 15. HTML / URL to PDF (Edge / Chrome Headless) ────────────────────────
     @router.post("/api/pdf/html-to-pdf")
     async def html_to_pdf(
         file: Optional[UploadFile] = File(None),
         url: str = Form(""),
+        orientation: str = Form("portrait"),  # "portrait" | "landscape"
+        page_size: str = Form("a4"),          # "a4" | "letter"
+        margin: str = Form("small"),          # "none" | "small" | "big"
         job_id: Optional[str] = Form(None),
     ):
         raw = await file.read() if file is not None else None
@@ -974,8 +1104,18 @@ def build_extended_pdf_router(
             with tempfile.TemporaryDirectory() as tmp_dir:
                 out_pdf = Path(tmp_dir) / f"{stem}.pdf"
                 if raw:
+                    css_size = "letter" if page_size.lower() == "letter" else "A4"
+                    css_orient = "landscape" if orientation == "landscape" else "portrait"
+                    css_margin = "0mm" if margin == "none" else ("10mm" if margin == "small" else "25mm")
+                    page_style = f"<style>@page {{ size: {css_size} {css_orient}; margin: {css_margin}; }}</style>"
+                    html_str = raw.decode("utf-8", errors="replace")
+                    if "</head>" in html_str.lower():
+                        idx_h = html_str.lower().index("</head>")
+                        html_str = html_str[:idx_h] + page_style + html_str[idx_h:]
+                    else:
+                        html_str = page_style + html_str
                     in_html = Path(tmp_dir) / "input.html"
-                    in_html.write_bytes(raw)
+                    in_html.write_text(html_str, encoding="utf-8")
                     source_arg = in_html.as_uri()
                 else:
                     source_arg = target_url if target_url.startswith(("http://", "https://")) else f"https://{target_url}"
@@ -1015,24 +1155,26 @@ def build_extended_pdf_router(
     @router.post("/api/pdf/pdf-to-pdfa")
     async def pdf_to_pdfa(
         file: UploadFile = File(...),
+        conformance: str = Form("2b"),  # "1b" | "2b" | "3b"
         job_id: Optional[str] = Form(None),
     ):
         raw = await file.read()
         stem = Path(file.filename or "document").stem
+        part = "1" if conformance == "1b" else ("3" if conformance == "3b" else "2")
 
         def _run():
-            job_init(job_id, total=2, detail="Converting to archival PDF/A-2b...")
+            job_init(job_id, total=2, detail=f"Converting to archival PDF/A-{part}b...")
             gs_bin = _find_gs_binary()
             if gs_bin:
                 with tempfile.TemporaryDirectory() as tmp_dir:
                     in_p = Path(tmp_dir) / "in.pdf"
                     out_p = Path(tmp_dir) / "out.pdf"
                     in_p.write_bytes(raw)
-                    job_update(job_id, 1, 2, "Running Ghostscript PDF/A-2b conversion...")
+                    job_update(job_id, 1, 2, f"Running Ghostscript PDF/A-{part}b conversion...")
                     res = subprocess.run(
                         [
                             gs_bin,
-                            "-dPDFA=2",
+                            f"-dPDFA={part}",
                             "-dBATCH",
                             "-dNOPAUSE",
                             "-sColorConversionStrategy=RGB",
@@ -1046,14 +1188,13 @@ def build_extended_pdf_router(
                         timeout=180,
                     )
                     if res.returncode == 0 and out_p.exists():
-                        job_finish(job_id, "done", "Converted to PDF/A-2b via Ghostscript")
+                        job_finish(job_id, "done", f"Converted to PDF/A-{part}b via Ghostscript")
                         return out_p.read_bytes()
 
-            # Pure-Python archival cleanup + PDF/A-2b XMP conformance metadata via PyMuPDF + pikepdf
             doc = pymupdf.open(stream=raw, filetype="pdf")
             try:
                 total = len(doc)
-                job_update(job_id, 1, 2, f"Normalizing {total} pages & embedding PDF/A XMP metadata...")
+                job_update(job_id, 1, 2, f"Normalizing {total} pages & embedding PDF/A-{part}b XMP metadata...")
                 doc.bake(annots=True, widgets=True)
                 clean_bytes = doc.tobytes(garbage=4, deflate=True, clean=True)
             finally:
@@ -1061,14 +1202,14 @@ def build_extended_pdf_router(
 
             with pikepdf.open(io.BytesIO(clean_bytes)) as pdf:
                 with pdf.open_metadata(set_pikepdf_as_editor=False) as meta:
-                    meta["pdfaid:part"] = "2"
+                    meta["pdfaid:part"] = part
                     meta["pdfaid:conformance"] = "B"
                     meta["dc:title"] = stem
                 out_buf = io.BytesIO()
-                pdf.save(out_buf, min_version="1.7")
+                pdf.save(out_buf, min_version="1.4" if part == "1" else "1.7")
                 result_bytes = out_buf.getvalue()
 
-            job_finish(job_id, "done", f"Saved archival PDF/A ({total} pages)")
+            job_finish(job_id, "done", f"Saved archival PDF/A-{part}b ({total} pages)")
             return result_bytes
 
         try:
