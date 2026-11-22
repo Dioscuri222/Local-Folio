@@ -1,10 +1,13 @@
+import asyncio
 import io
 import os
 import tempfile
+import threading
+import time
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pypdfium2 as pdfium
@@ -26,8 +29,75 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Original-Size", "X-Compressed-Size", "X-Page-Count", "Content-Disposition"],
+    expose_headers=["X-Original-Size", "X-Compressed-Size", "X-Page-Count", "X-OCR-Pages", "X-Digital-Pages", "Content-Disposition"],
 )
+
+# Thread-safe live job progress & cancellation registry
+_jobs_lock = threading.Lock()
+_jobs: Dict[str, dict] = {}
+
+
+class JobCancelledError(Exception):
+    """Raised when a user cancels an active processing job."""
+
+
+def _job_init(job_id: Optional[str], total: int = 0, detail: str = "Starting...") -> None:
+    if not job_id:
+        return
+    now = time.time()
+    with _jobs_lock:
+        if _jobs.get(job_id, {}).get("cancel_requested"):
+            raise JobCancelledError("Cancelled by user.")
+        # Prune stale finished jobs if registry grows large
+        if len(_jobs) > 100:
+            stale = [k for k, v in _jobs.items() if now - v.get("updated_at", 0) > 1800]
+            for k in stale:
+                _jobs.pop(k, None)
+        _jobs[job_id] = {
+            "status": "running",
+            "current": 0,
+            "total": total,
+            "detail": detail,
+            "cancel_requested": False,
+            "updated_at": now,
+        }
+
+
+def _job_update(job_id: Optional[str], current: int, total: int, detail: str) -> None:
+    if not job_id:
+        return
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if not job:
+            return
+        if job.get("cancel_requested"):
+            raise JobCancelledError("Cancelled by user.")
+        job["current"] = current
+        job["total"] = total
+        job["detail"] = detail
+        job["updated_at"] = time.time()
+
+
+def _job_check_cancel(job_id: Optional[str]) -> None:
+    if not job_id:
+        return
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if job and job.get("cancel_requested"):
+            raise JobCancelledError("Cancelled by user.")
+
+
+def _job_finish(job_id: Optional[str], status: str, detail: str) -> None:
+    if not job_id:
+        return
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if job:
+            job["status"] = status
+            job["detail"] = detail
+            if status == "done" and job["total"] > 0:
+                job["current"] = job["total"]
+            job["updated_at"] = time.time()
 
 # Lazy singleton for RapidOCR (Baidu PaddleOCR ONNX runtime)
 _ocr_engine: Optional[RapidOCR] = None
@@ -97,12 +167,19 @@ def _score_ocr_result(result) -> Tuple[float, List[str], float]:
     return horiz_weight, lines, avg_conf
 
 
-def _downscale_for_ocr(img: Image.Image, max_side: int = 2200) -> Image.Image:
+def _downscale_for_ocr(img: Image.Image, max_side: int = 2000) -> Image.Image:
     w, h = img.size
     if max(w, h) <= max_side:
         return img
     scale = max_side / float(max(w, h))
     return img.resize((int(w * scale), int(h * scale)), Image.Resampling.LANCZOS)
+
+
+def _is_nearly_blank(img: Image.Image) -> bool:
+    """Quickly detect blank/solid pages so RapidOCR does not waste extra passes."""
+    small = img.convert("L").resize((64, 64))
+    arr = np.array(small, dtype=np.float32)
+    return float(arr.std()) < 4.0
 
 
 def run_rapidocr_on_image(
@@ -114,6 +191,9 @@ def run_rapidocr_on_image(
     base_img = ImageOps.exif_transpose(img).convert("RGB")
     base_img = _downscale_for_ocr(base_img)
 
+    if _is_nearly_blank(base_img):
+        return "", 0, 0.0, 0
+
     if rotate_mode in {"0", "90", "180", "270"}:
         deg = int(rotate_mode)
         rotated = base_img.rotate(-deg, expand=True) if deg else base_img
@@ -121,8 +201,7 @@ def run_rapidocr_on_image(
         _, lines, avg_conf = _score_ocr_result(res)
         return "\n".join(lines), deg, avg_conf, len(lines)
 
-    # Auto mode: test 0 deg first; if result looks rotated or weak, also test 90 & 270 deg
-    candidates = [0]
+    # Auto mode: test 0 deg first; only retry rotated orientations if boxes are vertical or very weak
     res0, _ = engine(np.array(base_img))
     best_score, best_lines, best_conf = _score_ocr_result(res0)
     best_deg = 0
@@ -139,8 +218,8 @@ def run_rapidocr_on_image(
 
     needs_rotation_check = (
         total_boxes == 0
-        or best_conf < 0.82
         or (total_boxes > 0 and vertical_boxes / total_boxes >= 0.35)
+        or (best_conf < 0.72 and total_boxes < 15)
     )
 
     if needs_rotation_check:
@@ -154,7 +233,7 @@ def run_rapidocr_on_image(
     return "\n".join(best_lines), best_deg, best_conf, len(best_lines)
 
 
-def render_pdf_pages_pil(pdf_bytes: bytes, scale: float = 2.0) -> List[Image.Image]:
+def render_pdf_pages_pil(pdf_bytes: bytes, scale: float = 1.5) -> List[Image.Image]:
     doc = pdfium.PdfDocument(pdf_bytes)
     images: List[Image.Image] = []
     try:
@@ -166,6 +245,23 @@ def render_pdf_pages_pil(pdf_bytes: bytes, scale: float = 2.0) -> List[Image.Ima
     finally:
         doc.close()
     return images
+
+
+def iter_pdf_pages_pil(pdf_bytes: bytes, scale: float = 1.5):
+    """Yield (1-based page_num, total_pages, pil_image) one page at a time to save memory."""
+    doc = pdfium.PdfDocument(pdf_bytes)
+    try:
+        total = len(doc)
+        for idx in range(total):
+            page = doc[idx]
+            try:
+                bitmap = page.render(scale=scale)
+                img = bitmap.to_pil()
+            finally:
+                page.close()
+            yield idx + 1, total, img
+    finally:
+        doc.close()
 
 
 def parse_page_ranges(range_str: str, total_pages: int) -> List[int]:
@@ -208,8 +304,47 @@ async def health_check():
     return {
         "status": "ok",
         "engine": "local-folio",
-        "features": ["microsoft-markitdown", "rapidocr-onnx", "pdf-tools"],
+        "features": ["microsoft-markitdown", "rapidocr-onnx", "pdf-tools", "live-progress"],
     }
+
+
+@app.get("/api/jobs/{job_id}")
+async def get_job_progress(job_id: str):
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if not job:
+            return {"status": "unknown", "current": 0, "total": 0, "pct": 0, "detail": "Waiting..."}
+        total = job["total"]
+        current = job["current"]
+        pct = int(round((current / total) * 100)) if total > 0 else 0
+        return {
+            "status": job["status"],
+            "current": current,
+            "total": total,
+            "pct": min(100, max(0, pct)),
+            "detail": job["detail"],
+        }
+
+
+@app.post("/api/jobs/{job_id}/cancel")
+async def cancel_job(job_id: str):
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if not job:
+            _jobs[job_id] = {
+                "status": "cancelled",
+                "current": 0,
+                "total": 0,
+                "detail": "Cancelled by user.",
+                "cancel_requested": True,
+                "updated_at": time.time(),
+            }
+        else:
+            job["cancel_requested"] = True
+            job["status"] = "cancelled"
+            job["detail"] = "Cancelling..."
+            job["updated_at"] = time.time()
+    return {"status": "cancelled", "job_id": job_id}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -224,22 +359,26 @@ async def convert_file(
     llm_api_key: Optional[str] = Form(None),
     llm_base_url: Optional[str] = Form(None),
     llm_model: Optional[str] = Form(None),
+    job_id: Optional[str] = Form(None),
 ):
     filename = file.filename or "untitled"
     ext = Path(filename).suffix.lower()
     raw_bytes = await file.read()
     size = len(raw_bytes)
-    method = (
-        "Microsoft MarkItDown + Vision"
-        if (llm_model and (llm_api_key or llm_base_url))
-        else "Microsoft MarkItDown"
-    )
+    content_type = file.content_type or ""
 
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        tmp_path = Path(tmp_dir) / f"input{ext}"
-        tmp_path.write_bytes(raw_bytes)
+    def _run():
+        method = (
+            "Microsoft MarkItDown + Vision"
+            if (llm_model and (llm_api_key or llm_base_url))
+            else "Microsoft MarkItDown"
+        )
+        _job_init(job_id, total=0, detail=f"Converting {filename}...")
 
-        try:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir) / f"input{ext}"
+            tmp_path.write_bytes(raw_bytes)
+
             md_engine = create_markitdown_instance(
                 llm_api_key=llm_api_key.strip() if llm_api_key else None,
                 llm_base_url=llm_base_url.strip() if llm_base_url else None,
@@ -247,39 +386,51 @@ async def convert_file(
             )
             result = md_engine.convert(str(tmp_path))
             text = (result.text_content or "").strip()
-        except Exception as exc:
-            return JSONResponse(status_code=500, content={"error": str(exc)})
 
-    is_empty_pdf = ext == ".pdf" and len(text) == 0
+        is_empty_pdf = ext == ".pdf" and len(text) == 0
 
-    # Automatic server-side RapidOCR fallback for scanned/image-only PDFs
-    if is_empty_pdf and enable_ocr:
-        try:
-            pages = render_pdf_pages_pil(raw_bytes, scale=2.0)
-            ocr_sections: List[str] = []
-            for idx, page_img in enumerate(pages, start=1):
-                page_txt, _, _, _ = run_rapidocr_on_image(page_img, rotate_mode="auto")
-                if len(pages) > 1:
-                    ocr_sections.append(f"## Page {idx}\n\n{page_txt or '> [No text detected]'}")
-                else:
-                    ocr_sections.append(page_txt or "> [No text detected]")
-            text = f"# {Path(filename).stem}\n\n" + "\n\n".join(ocr_sections)
-            method = "RapidOCR (PDF Scan)"
-            is_empty_pdf = False
-        except Exception as ocr_exc:
-            text = f"> [RapidOCR fallback failed: {ocr_exc}]"
+        # Automatic server-side RapidOCR fallback for scanned/image-only PDFs
+        if is_empty_pdf and enable_ocr:
+            try:
+                ocr_sections: List[str] = []
+                total_pages = 0
+                for page_num, total, page_img in iter_pdf_pages_pil(raw_bytes, scale=1.5):
+                    total_pages = total
+                    _job_update(job_id, page_num - 1, total, f"OCR page {page_num} of {total} ({filename})")
+                    page_txt, _, _, _ = run_rapidocr_on_image(page_img, rotate_mode="0")
+                    if total > 1:
+                        ocr_sections.append(f"## Page {page_num}\n\n{page_txt or '> [No text detected]'}")
+                    else:
+                        ocr_sections.append(page_txt or "> [No text detected]")
+                    _job_update(job_id, page_num, total, f"OCR page {page_num} of {total} ({filename})")
+                text = f"# {Path(filename).stem}\n\n" + "\n\n".join(ocr_sections)
+                method = "RapidOCR (PDF Scan)"
+                is_empty_pdf = False
+            except JobCancelledError:
+                raise
+            except Exception as ocr_exc:
+                text = f"> [RapidOCR fallback failed: {ocr_exc}]"
 
-    markdown = (
-        build_frontmatter(filename, size, file.content_type or "", method) if enable_frontmatter else ""
-    ) + text
+        markdown = (
+            build_frontmatter(filename, size, content_type, method) if enable_frontmatter else ""
+        ) + text
+        _job_finish(job_id, "done", f"Converted {filename}")
+        return {
+            "filename": filename,
+            "markdown": markdown,
+            "raw_text_length": len(text),
+            "is_empty_pdf": is_empty_pdf,
+            "method": method,
+        }
 
-    return {
-        "filename": filename,
-        "markdown": markdown,
-        "raw_text_length": len(text),
-        "is_empty_pdf": is_empty_pdf,
-        "method": method,
-    }
+    try:
+        return await asyncio.to_thread(_run)
+    except JobCancelledError as exc:
+        _job_finish(job_id, "cancelled", str(exc))
+        return JSONResponse(status_code=499, content={"error": str(exc)})
+    except Exception as exc:
+        _job_finish(job_id, "error", str(exc))
+        return JSONResponse(status_code=500, content={"error": str(exc)})
 
 
 @app.post("/api/convert-url")
@@ -324,33 +475,40 @@ async def convert_url(
 async def ocr_extract(
     file: UploadFile = File(...),
     rotate: str = Form("auto"),
+    job_id: Optional[str] = Form(None),
 ):
     filename = file.filename or "image.jpg"
     ext = Path(filename).suffix.lower()
     raw_bytes = await file.read()
 
-    try:
+    def _run():
         if ext == ".pdf":
-            pages = render_pdf_pages_pil(raw_bytes, scale=2.0)
+            pdf_rotate = "0" if rotate == "auto" else rotate
             parts: List[str] = []
             total_lines = 0
             confs: List[float] = []
             applied_deg = 0
-            for idx, page_img in enumerate(pages, start=1):
-                txt, deg, conf, count = run_rapidocr_on_image(page_img, rotate_mode=rotate)
+            total_pages = 0
+            _job_init(job_id, total=0, detail=f"Opening {filename}...")
+            for page_num, total, page_img in iter_pdf_pages_pil(raw_bytes, scale=1.5):
+                total_pages = total
+                _job_update(job_id, page_num - 1, total, f"OCR page {page_num} of {total} ({filename})")
+                txt, deg, conf, count = run_rapidocr_on_image(page_img, rotate_mode=pdf_rotate)
                 applied_deg = deg
                 total_lines += count
                 if conf > 0:
                     confs.append(conf)
-                parts.append(f"--- Page {idx} ---\n{txt}" if len(pages) > 1 else txt)
+                parts.append(f"--- Page {page_num} ---\n{txt}" if total > 1 else txt)
+                _job_update(job_id, page_num, total, f"OCR page {page_num} of {total} ({filename})")
             full_text = "\n\n".join(parts).strip()
             avg_conf = round((sum(confs) / len(confs)) * 100, 1) if confs else 0.0
+            _job_finish(job_id, "done", f"Completed {filename}")
             return {
                 "filename": filename,
                 "text": full_text,
                 "rotation_applied": applied_deg,
                 "line_count": total_lines,
-                "page_count": len(pages),
+                "page_count": total_pages,
                 "avg_confidence": avg_conf,
                 "engine": "RapidOCR (PaddleOCR ONNX)",
             }
@@ -366,7 +524,14 @@ async def ocr_extract(
             "avg_confidence": round(conf * 100, 1),
             "engine": "RapidOCR (PaddleOCR ONNX)",
         }
+
+    try:
+        return await asyncio.to_thread(_run)
+    except JobCancelledError as exc:
+        _job_finish(job_id, "cancelled", str(exc))
+        return JSONResponse(status_code=499, content={"error": str(exc)})
     except Exception as exc:
+        _job_finish(job_id, "error", str(exc))
         return JSONResponse(status_code=500, content={"error": str(exc)})
 
 
@@ -489,27 +654,37 @@ async def pdf_rotate(
 
 
 @app.post("/api/pdf/compress")
-async def pdf_compress(file: UploadFile = File(...)):
+async def pdf_compress(
+    file: UploadFile = File(...),
+    job_id: Optional[str] = Form(None),
+):
     raw = await file.read()
     orig_size = len(raw)
     stem = Path(file.filename or "document").stem
-    try:
+
+    def _run():
         reader = PdfReader(io.BytesIO(raw))
+        total = len(reader.pages)
+        _job_init(job_id, total=total, detail=f"Preparing {total} pages...")
         writer = PdfWriter()
         for page in reader.pages:
             writer.add_page(page)
-        for page in writer.pages:
+        for idx, page in enumerate(writer.pages, start=1):
+            _job_update(job_id, idx - 1, total, f"Compressing page {idx} of {total}...")
             try:
                 page.compress_content_streams()
             except Exception:
                 pass
             for img_file in getattr(page, "images", []):
+                _job_check_cancel(job_id)
                 try:
                     pil_img = img_file.image
                     if pil_img is not None:
                         img_file.replace(pil_img.convert("RGB"), quality=72)
                 except Exception:
                     pass
+            _job_update(job_id, idx, total, f"Compressed page {idx} of {total}")
+        _job_check_cancel(job_id)
         try:
             writer.compress_identical_objects(remove_identicals=True, remove_orphans=True)
         except Exception:
@@ -517,6 +692,11 @@ async def pdf_compress(file: UploadFile = File(...)):
         out = io.BytesIO()
         writer.write(out)
         compressed_bytes = out.getvalue()
+        _job_finish(job_id, "done", f"Compressed {total} pages")
+        return compressed_bytes
+
+    try:
+        compressed_bytes = await asyncio.to_thread(_run)
         return StreamingResponse(
             io.BytesIO(compressed_bytes),
             media_type="application/pdf",
@@ -526,7 +706,11 @@ async def pdf_compress(file: UploadFile = File(...)):
                 "X-Compressed-Size": str(len(compressed_bytes)),
             },
         )
+    except JobCancelledError as exc:
+        _job_finish(job_id, "cancelled", str(exc))
+        raise HTTPException(status_code=499, detail=str(exc))
     except Exception as exc:
+        _job_finish(job_id, "error", str(exc))
         raise HTTPException(status_code=500, detail=str(exc))
 
 
@@ -535,6 +719,7 @@ async def pdf_to_images(
     file: UploadFile = File(...),
     img_format: str = Form("jpeg"),  # "jpeg" | "png"
     dpi: int = Form(150),
+    job_id: Optional[str] = Form(None),
 ):
     raw = await file.read()
     stem = Path(file.filename or "document").stem
@@ -542,27 +727,40 @@ async def pdf_to_images(
     ext = "png" if fmt == "PNG" else "jpg"
     scale = max(1.0, min(4.0, dpi / 72.0))
 
-    try:
-        pages = render_pdf_pages_pil(raw, scale=scale)
+    def _run():
+        _job_init(job_id, total=0, detail="Opening PDF...")
         zip_buf = io.BytesIO()
+        total_pages = 0
         with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
-            for idx, img in enumerate(pages, start=1):
+            for page_num, total, img in iter_pdf_pages_pil(raw, scale=scale):
+                total_pages = total
+                _job_update(job_id, page_num - 1, total, f"Rendering page {page_num} of {total} ({dpi} DPI)...")
                 buf = io.BytesIO()
                 if fmt == "JPEG":
                     img.convert("RGB").save(buf, format="JPEG", quality=90)
                 else:
                     img.save(buf, format="PNG")
-                zf.writestr(f"{stem}_page_{idx}.{ext}", buf.getvalue())
+                zf.writestr(f"{stem}_page_{page_num}.{ext}", buf.getvalue())
+                _job_update(job_id, page_num, total, f"Rendered page {page_num} of {total}")
         zip_buf.seek(0)
+        _job_finish(job_id, "done", f"Rendered {total_pages} pages")
+        return zip_buf, total_pages
+
+    try:
+        zip_buf, total_pages = await asyncio.to_thread(_run)
         return StreamingResponse(
             zip_buf,
             media_type="application/zip",
             headers={
                 "Content-Disposition": f'attachment; filename="{stem}_images.zip"',
-                "X-Page-Count": str(len(pages)),
+                "X-Page-Count": str(total_pages),
             },
         )
+    except JobCancelledError as exc:
+        _job_finish(job_id, "cancelled", str(exc))
+        raise HTTPException(status_code=499, detail=str(exc))
     except Exception as exc:
+        _job_finish(job_id, "error", str(exc))
         raise HTTPException(status_code=500, detail=str(exc))
 
 
@@ -691,54 +889,124 @@ async def pdf_unlock(
 
 
 @app.post("/api/pdf/to-markdown")
-async def pdf_to_markdown(file: UploadFile = File(...)):
+async def pdf_to_markdown(
+    file: UploadFile = File(...),
+    job_id: Optional[str] = Form(None),
+):
     raw = await file.read()
     stem = Path(file.filename or "document").stem
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        tmp_path = Path(tmp_dir) / "input.pdf"
-        tmp_path.write_bytes(raw)
-        try:
+
+    def _run():
+        _job_init(job_id, total=0, detail=f"Converting {stem}.pdf to Markdown...")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir) / "input.pdf"
+            tmp_path.write_bytes(raw)
             md_engine = MarkItDown()
             result = md_engine.convert(str(tmp_path))
             text = (result.text_content or "").strip()
-        except Exception as exc:
-            raise HTTPException(status_code=500, detail=str(exc))
 
-    if not text:
-        pages = render_pdf_pages_pil(raw, scale=2.0)
-        sections = []
-        for idx, page_img in enumerate(pages, start=1):
-            p_txt, _, _, _ = run_rapidocr_on_image(page_img, rotate_mode="auto")
-            sections.append(f"## Page {idx}\n\n{p_txt}" if len(pages) > 1 else p_txt)
-        text = f"# {stem}\n\n" + "\n\n".join(sections)
+        if not text:
+            sections = []
+            for page_num, total, page_img in iter_pdf_pages_pil(raw, scale=1.5):
+                _job_update(job_id, page_num - 1, total, f"Scanned PDF — OCR page {page_num} of {total}...")
+                p_txt, _, _, _ = run_rapidocr_on_image(page_img, rotate_mode="0")
+                sections.append(f"## Page {page_num}\n\n{p_txt}" if total > 1 else p_txt)
+                _job_update(job_id, page_num, total, f"Scanned PDF — OCR page {page_num} of {total}")
+            text = f"# {stem}\n\n" + "\n\n".join(sections)
 
-    return StreamingResponse(
-        io.BytesIO(text.encode("utf-8")),
-        media_type="text/markdown; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{stem}.md"'},
-    )
+        _job_finish(job_id, "done", f"Converted {stem}.pdf to Markdown")
+        return text
+
+    try:
+        text = await asyncio.to_thread(_run)
+        return StreamingResponse(
+            io.BytesIO(text.encode("utf-8")),
+            media_type="text/markdown; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{stem}.md"'},
+        )
+    except JobCancelledError as exc:
+        _job_finish(job_id, "cancelled", str(exc))
+        raise HTTPException(status_code=499, detail=str(exc))
+    except Exception as exc:
+        _job_finish(job_id, "error", str(exc))
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @app.post("/api/pdf/ocr-pdf")
-async def pdf_ocr_download(file: UploadFile = File(...)):
+async def pdf_ocr_download(
+    file: UploadFile = File(...),
+    ocr_mode: str = Form("smart"),  # "smart" (digital text + OCR scanned pages) | "force" (OCR every page)
+    job_id: Optional[str] = Form(None),
+):
     raw = await file.read()
     stem = Path(file.filename or "document").stem
-    try:
-        pages = render_pdf_pages_pil(raw, scale=2.0)
+
+    def _run():
+        # Read embedded text layer first so Smart Hybrid mode skips OCR on digital text pages
+        embedded_texts: List[str] = []
+        if ocr_mode != "force":
+            try:
+                reader = PdfReader(io.BytesIO(raw))
+                for p in reader.pages:
+                    embedded_texts.append((p.extract_text() or "").strip())
+            except Exception:
+                embedded_texts = []
+
+        doc = pdfium.PdfDocument(raw)
         parts: List[str] = []
-        for idx, page_img in enumerate(pages, start=1):
-            txt, _, _, _ = run_rapidocr_on_image(page_img, rotate_mode="auto")
-            parts.append(f"--- Page {idx} ---\n{txt}" if len(pages) > 1 else txt)
+        ocr_pages = 0
+        digital_pages = 0
+        try:
+            total = len(doc)
+            _job_init(job_id, total=total, detail=f"Preparing {total} pages...")
+            for idx in range(total):
+                page_num = idx + 1
+                _job_check_cancel(job_id)
+
+                digital_txt = embedded_texts[idx] if idx < len(embedded_texts) else ""
+                if ocr_mode != "force" and len(digital_txt) >= 25:
+                    digital_pages += 1
+                    _job_update(job_id, page_num, total, f"Page {page_num} of {total} (digital text)")
+                    parts.append(f"--- Page {page_num} ---\n{digital_txt}" if total > 1 else digital_txt)
+                    continue
+
+                _job_update(job_id, page_num - 1, total, f"Page {page_num} of {total} — Running RapidOCR...")
+                page = doc[idx]
+                try:
+                    bitmap = page.render(scale=1.5)
+                    page_img = bitmap.to_pil()
+                finally:
+                    page.close()
+
+                txt, _, _, _ = run_rapidocr_on_image(page_img, rotate_mode="0")
+                ocr_pages += 1
+                parts.append(f"--- Page {page_num} ---\n{txt}" if total > 1 else txt)
+                _job_update(job_id, page_num, total, f"Page {page_num} of {total} — OCR done")
+        finally:
+            doc.close()
+
         out_text = "\n\n".join(parts).strip()
+        summary = f"Completed {total} pages ({digital_pages} digital, {ocr_pages} OCR)"
+        _job_finish(job_id, "done", summary)
+        return out_text, total, ocr_pages, digital_pages
+
+    try:
+        out_text, total, ocr_pages, digital_pages = await asyncio.to_thread(_run)
         return StreamingResponse(
             io.BytesIO(out_text.encode("utf-8")),
             media_type="text/plain; charset=utf-8",
             headers={
                 "Content-Disposition": f'attachment; filename="{stem}_ocr.txt"',
-                "X-Page-Count": str(len(pages)),
+                "X-Page-Count": str(total),
+                "X-OCR-Pages": str(ocr_pages),
+                "X-Digital-Pages": str(digital_pages),
             },
         )
+    except JobCancelledError as exc:
+        _job_finish(job_id, "cancelled", str(exc))
+        raise HTTPException(status_code=499, detail=str(exc))
     except Exception as exc:
+        _job_finish(job_id, "error", str(exc))
         raise HTTPException(status_code=500, detail=str(exc))
 
 
