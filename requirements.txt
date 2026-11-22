@@ -1,0 +1,16 @@
+# Core Web Server
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+python-multipart>=0.0.12
+
+# Document-to-Markdown Engine (External PyPI Dependency)
+markitdown[all]>=0.1.0
+
+# Local OCR Engine (Baidu PaddleOCR ONNX)
+rapidocr-onnxruntime>=1.4.0
+
+# Local PDF Toolkit & Image Processing
+pypdf>=5.0.0
+pypdfium2>=4.30.0
+Pillow>=10.0.0
+numpy>=1.26.0
