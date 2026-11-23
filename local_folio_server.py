@@ -11,8 +11,9 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pypdfium2 as pdfium
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from markitdown import MarkItDown
 from PIL import Image, ImageOps
@@ -24,6 +25,7 @@ HTML_PATH = APP_DIR / "local-folio.html"
 
 app = FastAPI(title="Local-Folio — Local PDF, OCR & Markdown Suite")
 
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -38,9 +40,21 @@ app.add_middleware(
         "X-Redaction-Count",
         "X-Diff-Added",
         "X-Diff-Removed",
+        "Server-Timing",
         "Content-Disposition",
     ],
 )
+
+
+@app.middleware("http")
+async def add_server_timing_and_trace(request: Request, call_next):
+    t0 = time.perf_counter()
+    response = await call_next(request)
+    dur_ms = (time.perf_counter() - t0) * 1000.0
+    response.headers["Server-Timing"] = f"app;dur={dur_ms:.1f}"
+    if dur_ms >= 1500.0 and not request.url.path.startswith("/api/jobs/"):
+        print(f"[Local-Folio][Slow] {request.method} {request.url.path} took {dur_ms:.0f}ms")
+    return response
 
 # Thread-safe live job progress & cancellation registry
 _jobs_lock = threading.Lock()
@@ -186,6 +200,7 @@ def create_markitdown_instance(
         client = OpenAI(
             api_key=llm_api_key or "ollama",
             base_url=llm_base_url or None,
+            timeout=60.0,
         )
         return MarkItDown(llm_client=client, llm_model=llm_model)
     return MarkItDown()
@@ -362,12 +377,16 @@ FAVICON_SVG = (
 async def serve_frontend():
     if not HTML_PATH.exists():
         raise HTTPException(status_code=404, detail="local-folio.html not found")
-    return FileResponse(HTML_PATH)
+    return FileResponse(HTML_PATH, headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/favicon.ico")
 async def serve_favicon():
-    return Response(content=FAVICON_SVG, media_type="image/svg+xml")
+    return Response(
+        content=FAVICON_SVG,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @app.get("/api/health")

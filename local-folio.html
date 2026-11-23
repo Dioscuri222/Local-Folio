@@ -6,10 +6,10 @@
   <title>Local-Folio | Local PDF, RapidOCR &amp; MarkItDown Studio</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='2' y='2' width='60' height='60' rx='16' fill='%23efe6da' stroke='%23e2d5c3' stroke-width='3'/%3E%3Cg transform='translate(14 14) scale(1.5)' fill='none' stroke='%238f4f24' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 2v2'/%3E%3Cpath d='M14 2v2'/%3E%3Cpath d='M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1'/%3E%3Cpath d='M6 2v2'/%3E%3C/g%3E%3C/svg%3E" />
 
-  <!-- Google Fonts: Cormorant Garamond, Outfit & IBM Plex Mono -->
+  <!-- Google Fonts: Cormorant Garamond, Outfit & IBM Plex Mono (trimmed weights) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=IBM+Plex+Mono:wght@400;600&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -28,16 +28,16 @@
     }
   </script>
 
-  <!-- Client-Side Libraries -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="https://unpkg.com/turndown/dist/turndown.js"></script>
-  <script src="https://unpkg.com/turndown-plugin-gfm/dist/turndown-plugin-gfm.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Client-Side Libraries (deferred so initial paint is never render-blocked) -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script defer src="https://unpkg.com/turndown/dist/turndown.js"></script>
+  <script defer src="https://unpkg.com/turndown-plugin-gfm/dist/turndown-plugin-gfm.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script defer src="https://unpkg.com/lucide@latest"></script>
 
   <style>
     :root {
@@ -240,6 +240,16 @@
       background-color: var(--accent-soft);
       border-color: var(--accent);
       color: var(--accent);
+    }
+
+    @keyframes skeleton-shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    .skeleton-box {
+      background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--bg-panel) 50%, var(--bg-elevated) 75%);
+      background-size: 200% 100%;
+      animation: skeleton-shimmer 1.3s ease-in-out infinite;
     }
 
     .cafe-aura {
@@ -1383,8 +1393,20 @@
   <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
   <script>
-    if (window.pdfjsLib) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    function debounce(fn, delay = 120) {
+      let timer = null;
+      return (...args) => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), delay);
+      };
+    }
+
+    function renderSkeletonCards(count = 6, aspectCls = 'aspect-[3/4]') {
+      return Array.from({ length: count }).map(() => `
+        <div class="rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] p-2 space-y-2">
+          <div class="w-full ${aspectCls} rounded-lg skeleton-box"></div>
+          <div class="h-3 w-1/2 rounded skeleton-box"></div>
+        </div>`).join('');
     }
 
     const settings = {
@@ -1756,6 +1778,11 @@
 
     function addUrlToQueue(url) {
       if (!backendAvailable) { showToast('Start local server (local-folio.bat) for URL extraction', 'warning'); return; }
+      // Prevent duplicate in-flight URL API calls
+      if (fileQueue.some(i => i.url === url && (i.status === 'pending' || i.status === 'converting'))) {
+        showToast('This URL is already queued', 'info');
+        return;
+      }
       const item = {
         id: 'u-' + Math.random().toString(36).slice(2, 10),
         file: { name: url, size: 0, type: 'text/uri-list' },
@@ -1768,15 +1795,17 @@
     }
 
     let cancelQueueRequested = false;
+    let queueDisplayLimit = 50;
 
     async function processQueue() {
       if (isProcessing) return;
       isProcessing = true;
       cancelQueueRequested = false;
       activeCancelHandler = () => { cancelQueueRequested = true; };
-      try {
-        while (true) {
-          if (cancelQueueRequested) break;
+      const CONCURRENCY = backendAvailable ? 2 : 1;
+
+      async function runWorker() {
+        while (!cancelQueueRequested) {
           const item = fileQueue.find(i => i.status === 'pending');
           if (!item) break;
           batchSpinner.classList.remove('hidden');
@@ -1784,7 +1813,8 @@
           updateUI();
           const doneNow = fileQueue.filter(i => i.status === 'done' || i.status === 'error').length;
           const jobId = generateJobId();
-          activeAbortController = new AbortController();
+          const controller = new AbortController();
+          activeAbortController = controller;
           updateSettingsProgress({
             active: true,
             title: 'Running: MarkItDown',
@@ -1806,7 +1836,7 @@
             });
           }
           try {
-            item.markdown = await convertFileToMarkdown(item, { signal: activeAbortController.signal, jobId });
+            item.markdown = await convertFileToMarkdown(item, { signal: controller.signal, jobId });
             item.status = 'done';
           } catch (err) {
             if (err.name === 'AbortError' || cancelQueueRequested) {
@@ -1818,13 +1848,17 @@
             item.errorMsg = err.message || 'Conversion failed';
           } finally {
             stopJobProgressPolling();
-            activeJobId = null;
-            activeAbortController = null;
+            if (activeJobId === jobId) activeJobId = null;
           }
           updateUI();
         }
+      }
+
+      try {
+        await Promise.all(Array.from({ length: CONCURRENCY }, () => runWorker()));
       } finally {
         isProcessing = false;
+        activeAbortController = null;
         activeCancelHandler = null;
         batchSpinner.classList.add('hidden');
         if (cancelQueueRequested) {
@@ -1887,7 +1921,8 @@
         fileQueueContainer.innerHTML = `<div class="p-6 text-center rounded-xl border border-dashed border-[var(--border-hairline)] text-xs text-[var(--ink-muted)]">No matching items.</div>`;
         return;
       }
-      filtered.forEach(item => {
+      const visible = filtered.slice(0, queueDisplayLimit);
+      visible.forEach(item => {
         const active = item.id === activeFileId;
         const card = document.createElement('div');
         const edge = item.status === 'done' ? 'border-l-[var(--accent)]' : item.status === 'error' ? 'border-l-[var(--crimson)]' : item.status === 'converting' ? 'border-l-[var(--gold)]' : 'border-l-[var(--border-strong)]';
@@ -1914,6 +1949,14 @@
         });
         fileQueueContainer.appendChild(card);
       });
+      if (filtered.length > visible.length) {
+        const moreBtn = document.createElement('button');
+        moreBtn.type = 'button';
+        moreBtn.className = 'w-full py-2 text-xs font-semibold rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] hover:border-[var(--accent)] text-[var(--accent)]';
+        moreBtn.textContent = `Show ${Math.min(50, filtered.length - visible.length)} more (${filtered.length - visible.length} remaining)`;
+        moreBtn.addEventListener('click', () => { queueDisplayLimit += 50; renderQueueList(); refreshIcons(); });
+        fileQueueContainer.appendChild(moreBtn);
+      }
     }
 
     function renderInspector() {
@@ -2326,24 +2369,41 @@
       });
     }
 
-    // ── Organize PDF Thumbnail Preview Helper ────────────────────────────────
-    async function loadOrganizeThumbnails(file) {
+    // ── Organize PDF Paginated WebP Thumbnail Preview Helper ─────────────────
+    let organizeTotalPages = 0;
+    let organizeHasMore = false;
+    let organizeLoading = false;
+
+    async function loadOrganizeThumbnails(file, append = false) {
       const container = document.getElementById('pdf-organize-thumbs');
       const orderInput = document.getElementById('pdf-organize-order');
-      if (!backendAvailable || !file) return;
+      if (!backendAvailable || !file || organizeLoading) return;
+      organizeLoading = true;
       container.classList.remove('hidden');
-      container.innerHTML = '<div class="col-span-full text-center text-xs text-[var(--ink-muted)] py-4 font-mono">Loading page thumbnails...</div>';
+      const offset = append ? organizeThumbItems.length : 0;
+      if (!append) {
+        organizeThumbItems = [];
+        container.innerHTML = renderSkeletonCards(8, 'h-24');
+      }
       try {
         const fd = new FormData();
         fd.append('file', file);
+        fd.append('offset', String(offset));
+        fd.append('limit', '24');
         const res = await fetch(`${API_BASE}/api/pdf/thumbnails`, { method: 'POST', body: fd });
         if (!res.ok) throw new Error('Failed to load thumbnails');
         const data = await res.json();
-        organizeThumbItems = data.thumbnails || [];
+        organizeTotalPages = data.total_pages || 0;
+        organizeHasMore = Boolean(data.has_more);
+        organizeThumbItems = append ? [...organizeThumbItems, ...(data.thumbnails || [])] : (data.thumbnails || []);
         orderInput.value = organizeThumbItems.map(t => t.page).join(', ');
         renderOrganizeThumbs();
       } catch (err) {
-        container.innerHTML = `<div class="col-span-full text-center text-xs text-[var(--ink-muted)] py-2">Enter page order manually (e.g. 3, 1, 2)</div>`;
+        if (!append) {
+          container.innerHTML = `<div class="col-span-full text-center text-xs text-[var(--ink-muted)] py-2">Enter page order manually (e.g. 3, 1, 2)</div>`;
+        }
+      } finally {
+        organizeLoading = false;
       }
     }
 
@@ -2357,7 +2417,7 @@
         const card = document.createElement('div');
         card.className = 'p-1.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] flex flex-col items-center gap-1';
         card.innerHTML = `
-          <img src="${item.src}" alt="Page ${item.page}" class="w-full h-24 object-contain rounded-lg bg-white border border-[var(--border-hairline)]" />
+          <img src="${item.src}" alt="Page ${item.page}" loading="lazy" decoding="async" class="w-full h-24 object-contain rounded-lg bg-white border border-[var(--border-hairline)]" />
           <div class="w-full flex items-center justify-between text-[10px] font-mono px-0.5">
             <span class="text-[var(--ink-primary)] font-semibold">P.${item.page}</span>
             <div class="flex items-center gap-1">
@@ -2381,6 +2441,14 @@
         });
         container.appendChild(card);
       });
+      if (organizeHasMore && pdfSelectedFiles[0]) {
+        const moreBtn = document.createElement('button');
+        moreBtn.type = 'button';
+        moreBtn.className = 'col-span-full py-2 text-xs font-semibold rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] hover:border-[var(--accent)] text-[var(--accent)]';
+        moreBtn.textContent = `Load more pages (${organizeThumbItems.length}/${organizeTotalPages})`;
+        moreBtn.addEventListener('click', () => loadOrganizeThumbnails(pdfSelectedFiles[0], true));
+        container.appendChild(moreBtn);
+      }
     }
 
     // ── Sign PDF Interactive Canvas Pad ──────────────────────────────────────
@@ -2455,9 +2523,16 @@
       });
     }
 
-    // ── Real-Time Visual Preview Engine for PDF Tools ────────────────────────
-    const pdfPreviewCache = new WeakMap(); // File -> { kind, pages: [{page, src, w, h}], totalPages, url, htmlText }
+    // ── Real-Time Visual Preview Engine for PDF Tools (WebP + Skeleton + Pagination) ──
+    const pdfPreviewCache = new WeakMap(); // File -> { kind, pages: [{page, src, w, h}], totalPages, renderedLimit, url, htmlText }
+    const pdfPreviewInFlight = new WeakMap(); // Deduplicates concurrent renders for the same File
     let pdfPreviewRenderSeq = 0;
+    let pdfPreviewPageLimit = 12;
+
+    function canvasToWebpOrJpeg(cv) {
+      const webp = cv.toDataURL('image/webp', 0.80);
+      return webp.startsWith('data:image/webp') ? webp : cv.toDataURL('image/jpeg', 0.82);
+    }
 
     function parsePageRangeClient(str, total) {
       const res = new Set();
@@ -2491,59 +2566,78 @@
     async function ensureFilePreviewData(file, maxPages = 12) {
       if (pdfPreviewCache.has(file)) {
         const cached = pdfPreviewCache.get(file);
-        if (cached.kind !== 'pdf' || cached.renderedLimit >= maxPages) return cached;
+        if (cached.kind !== 'pdf' || cached.renderedLimit >= maxPages || cached.pages.length >= cached.totalPages) {
+          return cached;
+        }
+      }
+      if (pdfPreviewInFlight.has(file)) {
+        const pending = pdfPreviewInFlight.get(file);
+        if (pending.maxPages >= maxPages) return pending.promise;
       }
 
-      const nameLower = (file.name || '').toLowerCase();
-      if (file.type.startsWith('image/') || /\.(jpg|jpeg|png|webp|bmp|gif)$/.test(nameLower)) {
-        const url = URL.createObjectURL(file);
-        const dims = await new Promise((resolve) => {
-          const im = new Image();
-          im.onload = () => resolve({ w: im.naturalWidth || 800, h: im.naturalHeight || 1000 });
-          im.onerror = () => resolve({ w: 800, h: 1000 });
-          im.src = url;
-        });
-        const entry = { kind: 'image', url, w: dims.w, h: dims.h };
-        pdfPreviewCache.set(file, entry);
-        return entry;
-      }
-
-      if (nameLower.endsWith('.pdf') && window.pdfjsLib) {
-        try {
-          const buf = await file.arrayBuffer();
-          const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-          const total = pdf.numPages;
-          const limit = Math.min(total, maxPages);
-          const pages = [];
-          for (let i = 1; i <= limit; i++) {
-            const page = await pdf.getPage(i);
-            const vp = page.getViewport({ scale: 0.72 });
-            const cv = document.createElement('canvas');
-            cv.width = Math.max(1, Math.floor(vp.width));
-            cv.height = Math.max(1, Math.floor(vp.height));
-            await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
-            pages.push({ page: i, src: cv.toDataURL('image/jpeg', 0.82), w: vp.width, h: vp.height });
-          }
-          const entry = { kind: 'pdf', totalPages: total, pages, renderedLimit: maxPages };
-          pdfPreviewCache.set(file, entry);
-          return entry;
-        } catch (err) {
-          const entry = { kind: 'pdf-locked', totalPages: 0, pages: [], error: err.message || 'Encrypted or unreadable PDF' };
+      const workPromise = (async () => {
+        const nameLower = (file.name || '').toLowerCase();
+        if (file.type.startsWith('image/') || /\.(jpg|jpeg|png|webp|bmp|gif)$/.test(nameLower)) {
+          const url = URL.createObjectURL(file);
+          const dims = await new Promise((resolve) => {
+            const im = new Image();
+            im.onload = () => resolve({ w: im.naturalWidth || 800, h: im.naturalHeight || 1000 });
+            im.onerror = () => resolve({ w: 800, h: 1000 });
+            im.src = url;
+          });
+          const entry = { kind: 'image', url, w: dims.w, h: dims.h };
           pdfPreviewCache.set(file, entry);
           return entry;
         }
-      }
 
-      if (/\.(html|htm)$/.test(nameLower)) {
-        const htmlText = await file.text();
-        const entry = { kind: 'html', htmlText };
+        if (nameLower.endsWith('.pdf') && window.pdfjsLib) {
+          try {
+            const existing = pdfPreviewCache.get(file);
+            const buf = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+            const total = pdf.numPages;
+            const limit = Math.min(total, maxPages);
+            const pages = existing && existing.kind === 'pdf' ? [...existing.pages] : [];
+            const startPage = pages.length + 1;
+            for (let i = startPage; i <= limit; i++) {
+              const page = await pdf.getPage(i);
+              const vp = page.getViewport({ scale: 0.72 });
+              const cv = document.createElement('canvas');
+              cv.width = Math.max(1, Math.floor(vp.width));
+              cv.height = Math.max(1, Math.floor(vp.height));
+              await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+              pages.push({ page: i, src: canvasToWebpOrJpeg(cv), w: vp.width, h: vp.height });
+            }
+            const entry = { kind: 'pdf', totalPages: total, pages, renderedLimit: maxPages };
+            pdfPreviewCache.set(file, entry);
+            return entry;
+          } catch (err) {
+            const entry = { kind: 'pdf-locked', totalPages: 0, pages: [], error: err.message || 'Encrypted or unreadable PDF' };
+            pdfPreviewCache.set(file, entry);
+            return entry;
+          }
+        }
+
+        if (/\.(html|htm)$/.test(nameLower)) {
+          const htmlText = await file.text();
+          const entry = { kind: 'html', htmlText };
+          pdfPreviewCache.set(file, entry);
+          return entry;
+        }
+
+        const entry = { kind: 'doc', ext: (nameLower.split('.').pop() || 'file').toUpperCase() };
         pdfPreviewCache.set(file, entry);
         return entry;
-      }
+      })();
 
-      const entry = { kind: 'doc', ext: (nameLower.split('.').pop() || 'file').toUpperCase() };
-      pdfPreviewCache.set(file, entry);
-      return entry;
+      pdfPreviewInFlight.set(file, { maxPages, promise: workPromise });
+      try {
+        return await workPromise;
+      } finally {
+        if (pdfPreviewInFlight.get(file)?.promise === workPromise) {
+          pdfPreviewInFlight.delete(file);
+        }
+      }
     }
 
     function updatePdfWorkspaceLayout() {
@@ -2639,11 +2733,13 @@
         return;
       }
 
-      // 2. MULTI-PDF TOOLS (Merge, Compare, Workflow) — Cover thumbnail per PDF file
+        // 2. MULTI-PDF TOOLS (Merge, Compare, Workflow) — Cover thumbnail per PDF file
       if (['merge', 'compare', 'workflow'].includes(activePdfTool)) {
         metaEl.textContent = `${pdfSelectedFiles.length} PDF file${pdfSelectedFiles.length > 1 ? 's' : ''}`;
         grid.className = 'grid grid-cols-2 sm:grid-cols-3 gap-3.5 max-h-[640px] overflow-y-auto p-1';
-        grid.innerHTML = '<div class="col-span-full text-center py-8 text-xs font-mono text-[var(--ink-muted)]">Rendering PDF previews...</div>';
+        if (pdfSelectedFiles.some(f => !pdfPreviewCache.has(f))) {
+          grid.innerHTML = renderSkeletonCards(Math.min(6, pdfSelectedFiles.length));
+        }
 
         const infos = await Promise.all(pdfSelectedFiles.map(f => ensureFilePreviewData(f, 1)));
         if (seq !== pdfPreviewRenderSeq) return;
@@ -2656,7 +2752,7 @@
           card.className = 'rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] p-2.5 flex flex-col gap-2';
           card.innerHTML = `
             <div class="relative w-full aspect-[3/4] rounded-xl bg-white border border-[var(--border-hairline)] overflow-hidden flex items-center justify-center">
-              ${cover ? `<img src="${cover}" alt="${escapeHtml(f.name)}" class="w-full h-full object-contain" />` : `<i data-lucide="file-text" class="w-8 h-8 text-[var(--accent)]"></i>`}
+              ${cover ? `<img src="${cover}" alt="${escapeHtml(f.name)}" loading="lazy" decoding="async" class="w-full h-full object-contain" />` : `<i data-lucide="file-text" class="w-8 h-8 text-[var(--accent)]"></i>`}
               <span class="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-[var(--ink-primary)]/85 text-[var(--bg-panel)] text-[10px] font-mono">${info.totalPages ? info.totalPages + 'p' : 'PDF'}</span>
             </div>
             <div class="flex items-center justify-between gap-1 text-[11px]">
@@ -2682,8 +2778,11 @@
 
       // 3. SINGLE FILE TOOLS (PDF / HTML / Office)
       const firstFile = pdfSelectedFiles[0];
-      grid.innerHTML = '<div class="col-span-full text-center py-8 text-xs font-mono text-[var(--ink-muted)]">Rendering live preview...</div>';
-      const info = await ensureFilePreviewData(firstFile, 12);
+      if (!pdfPreviewCache.has(firstFile)) {
+        grid.className = 'grid grid-cols-2 sm:grid-cols-3 gap-3.5 max-h-[640px] overflow-y-auto p-1';
+        grid.innerHTML = renderSkeletonCards(6);
+      }
+      const info = await ensureFilePreviewData(firstFile, pdfPreviewPageLimit);
       if (seq !== pdfPreviewRenderSeq) return;
 
       if (info.kind === 'html') {
@@ -2857,7 +2956,7 @@
 
         card.innerHTML = `
           <div class="relative w-full aspect-[3/4] rounded-lg bg-white border border-black/10 overflow-hidden flex items-center justify-center">
-            <img src="${pg.src}" alt="Page ${pNum}" class="w-full h-full object-contain transition-transform duration-200" style="${isRotated ? `transform: rotate(${rotAngle}deg) scale(${rotAngle % 180 !== 0 ? 0.72 : 1});` : ''}" />
+            <img src="${pg.src}" alt="Page ${pNum}" loading="lazy" decoding="async" class="w-full h-full object-contain transition-transform duration-200" style="${isRotated ? `transform: rotate(${rotAngle}deg) scale(${rotAngle % 180 !== 0 ? 0.72 : 1});` : ''}" />
             ${overlayHtml}
           </div>
           <div class="flex items-center justify-between text-[10px] font-mono px-0.5">
@@ -2875,18 +2974,23 @@
       });
 
       if (total > pages.length && activePdfTool !== 'sign') {
-        const more = document.createElement('div');
-        more.className = 'col-span-full text-center text-[11px] font-mono text-[var(--ink-muted)] py-1';
-        more.textContent = `+ ${total - pages.length} more pages will also be processed`;
-        grid.appendChild(more);
+        const moreBtn = document.createElement('button');
+        moreBtn.type = 'button';
+        moreBtn.className = 'col-span-full py-2.5 px-4 text-xs font-semibold rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] hover:border-[var(--accent)] text-[var(--accent)] transition-colors';
+        moreBtn.textContent = `Load ${Math.min(12, total - pages.length)} more pages (${pages.length}/${total} shown)`;
+        moreBtn.addEventListener('click', () => {
+          pdfPreviewPageLimit += 12;
+          renderPdfLivePreview();
+        });
+        grid.appendChild(moreBtn);
       }
-      refreshIcons();
     }
 
     function selectPdfTool(toolId, openWorkspace = true) {
       activePdfTool = toolId;
       pdfSelectedFiles = [];
       organizeThumbItems = [];
+      pdfPreviewPageLimit = 12;
       renderPdfFileList();
       const meta = PDF_TOOLS_META[toolId];
       document.getElementById('pdf-active-title').textContent = meta.title;
@@ -2982,6 +3086,7 @@
     }
 
     async function runActivePdfTool() {
+      if (pdfIsRunning) return; // Prevent duplicate concurrent API calls
       if (!backendAvailable) { showToast('Run local-folio.bat to use local PDF Tools', 'warning'); return; }
       const meta = PDF_TOOLS_META[activePdfTool];
       const htmlUrl = (document.getElementById('pdf-html-url')?.value || '').trim();
@@ -3173,17 +3278,36 @@
           throw new Error(errData.detail || errData.error || `Failed (${res.status})`);
         }
 
-        const blob = await res.blob();
         const disp = res.headers.get('Content-Disposition') || '';
         const match = disp.match(/filename="([^"]+)"/);
         const filename = match ? match[1] : `local-folio_${activePdfTool}.pdf`;
 
-        // Preview AI Summary directly inside workspace as well as downloading
-        if (activePdfTool === 'ai-summarize') {
-          const mdText = await blob.text();
+        let blob;
+        // Stream AI Summary token-by-token into live preview as it arrives
+        if (activePdfTool === 'ai-summarize' && res.body) {
           const prev = document.getElementById('pdf-ai-preview');
-          prev.innerHTML = marked.parse(mdText);
           prev.classList.remove('hidden');
+          prev.innerHTML = '<p class="text-xs font-mono text-[var(--ink-muted)]">Streaming AI summary...</p>';
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let fullMd = '';
+          let lastPaint = 0;
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            fullMd += decoder.decode(value, { stream: true });
+            const now = performance.now();
+            if (now - lastPaint > 80) {
+              prev.innerHTML = window.marked ? marked.parse(fullMd) : escapeHtml(fullMd);
+              prev.scrollTop = prev.scrollHeight;
+              lastPaint = now;
+            }
+          }
+          fullMd += decoder.decode();
+          prev.innerHTML = window.marked ? marked.parse(fullMd) : escapeHtml(fullMd);
+          blob = new Blob([fullMd], { type: 'text/markdown;charset=utf-8' });
+        } else {
+          blob = await res.blob();
         }
 
         const link = document.createElement('a');
@@ -3410,7 +3534,11 @@
       const searchInput = document.getElementById('feature-search-input');
       document.getElementById('open-search-btn').addEventListener('click', openFeatureSearch);
       searchModal.addEventListener('click', e => { if (e.target === searchModal) closeFeatureSearch(); });
-      searchInput.addEventListener('input', e => { searchActiveIdx = 0; renderFeatureSearchResults(e.target.value); });
+      const debouncedFeatureSearch = debounce((val) => {
+        searchActiveIdx = 0;
+        renderFeatureSearchResults(val);
+      }, 90);
+      searchInput.addEventListener('input', e => debouncedFeatureSearch(e.target.value));
       searchInput.addEventListener('keydown', e => {
         if (e.key === 'ArrowDown') {
           e.preventDefault();
@@ -3448,7 +3576,7 @@
       fileInput.addEventListener('change', e => { addFilesToQueue(e.target.files); fileInput.value = ''; });
       urlConvertForm.addEventListener('submit', e => { e.preventDefault(); if (urlInput.value.trim()) { addUrlToQueue(urlInput.value.trim()); urlInput.value = ''; } });
 
-      queueSearch.addEventListener('input', renderQueueList);
+      queueSearch.addEventListener('input', debounce(renderQueueList, 120));
       statusFilter.addEventListener('change', renderQueueList);
       document.getElementById('clear-queue-btn').addEventListener('click', () => { fileQueue = []; activeFileId = null; updateUI(); });
       document.getElementById('download-zip-btn').addEventListener('click', async () => {
@@ -3547,11 +3675,12 @@
       pdfToolInput.addEventListener('change', e => { addFilesToPdfTool(e.target.files); pdfToolInput.value = ''; });
       document.getElementById('pdf-clear-files-btn').addEventListener('click', () => { pdfSelectedFiles = []; renderPdfFileList(); });
 
-      // Live real-time preview refresh whenever any option input/select changes inside PDF workspace
+      // Live real-time preview refresh (debounced on text input to prevent unnecessary re-renders)
       const pdfOptionsCard = document.getElementById('pdf-options-card');
+      const debouncedPreviewRefresh = debounce(renderPdfLivePreview, 130);
       pdfOptionsCard.addEventListener('input', (e) => {
-        if (e.target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName) && e.target.id !== 'pdf-tool-input') {
-          renderPdfLivePreview();
+        if (e.target && ['INPUT', 'TEXTAREA'].includes(e.target.tagName) && e.target.id !== 'pdf-tool-input') {
+          debouncedPreviewRefresh();
         }
       });
       pdfOptionsCard.addEventListener('change', (e) => {
@@ -3589,6 +3718,9 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
+      if (window.pdfjsLib) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
       initTheme();
       setupEvents();
       selectPdfTool('merge', false);

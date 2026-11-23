@@ -1,12 +1,15 @@
 import asyncio
 import base64
 import difflib
+import hashlib
 import io
 import json
 import os
 import shutil
 import subprocess
 import tempfile
+import threading
+from collections import OrderedDict
 from pathlib import Path
 from typing import Callable, List, Optional
 
@@ -545,27 +548,60 @@ def build_extended_pdf_router(
             job_finish(job_id, "error", str(exc))
             raise HTTPException(status_code=500, detail=f"Unable to repair PDF: {exc}")
 
-    # ── 6. Organize PDF (+ Thumbnails Preview Helper) ─────────────────────────
+    # Bounded in-memory LRU cache for rendered WebP page thumbnails (local equivalent of Redis cache)
+    _thumb_cache_lock = threading.Lock()
+    _thumb_cache: OrderedDict = OrderedDict()
+    _THUMB_CACHE_MAX = 16
+
+    # ── 6. Organize PDF (+ Paginated WebP Thumbnails Preview Helper) ──────────
     @router.post("/api/pdf/thumbnails")
-    async def pdf_thumbnails(file: UploadFile = File(...)):
+    async def pdf_thumbnails(
+        file: UploadFile = File(...),
+        offset: int = Form(0),
+        limit: int = Form(24),
+    ):
         raw = await file.read()
+        safe_offset = max(0, offset)
+        safe_limit = max(1, min(60, limit))
+        cache_key = (hashlib.sha256(raw).hexdigest()[:16], safe_offset, safe_limit)
+
+        with _thumb_cache_lock:
+            cached = _thumb_cache.get(cache_key)
+            if cached is not None:
+                _thumb_cache.move_to_end(cache_key)
+                return cached
 
         def _run():
             doc = pymupdf.open(stream=raw, filetype="pdf")
             thumbs = []
             try:
                 total = len(doc)
-                limit = min(total, 60)
-                for idx in range(limit):
+                end = min(total, safe_offset + safe_limit)
+                for idx in range(safe_offset, end):
                     pix = doc[idx].get_pixmap(matrix=pymupdf.Matrix(0.32, 0.32), alpha=False)
-                    b64 = base64.b64encode(pix.tobytes("jpeg")).decode("ascii")
-                    thumbs.append({"page": idx + 1, "src": f"data:image/jpeg;base64,{b64}"})
+                    im = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                    wbuf = io.BytesIO()
+                    im.save(wbuf, format="WEBP", quality=78, method=4)
+                    b64 = base64.b64encode(wbuf.getvalue()).decode("ascii")
+                    thumbs.append({"page": idx + 1, "src": f"data:image/webp;base64,{b64}"})
             finally:
                 doc.close()
-            return {"total_pages": total, "thumbnails": thumbs}
+            return {
+                "total_pages": total,
+                "offset": safe_offset,
+                "limit": safe_limit,
+                "has_more": end < total,
+                "thumbnails": thumbs,
+            }
 
         try:
-            return await asyncio.to_thread(_run)
+            payload = await asyncio.to_thread(_run)
+            with _thumb_cache_lock:
+                _thumb_cache[cache_key] = payload
+                _thumb_cache.move_to_end(cache_key)
+                while len(_thumb_cache) > _THUMB_CACHE_MAX:
+                    _thumb_cache.popitem(last=False)
+            return payload
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc))
 
@@ -1226,7 +1262,7 @@ def build_extended_pdf_router(
             job_finish(job_id, "error", str(exc))
             raise HTTPException(status_code=500, detail=str(exc))
 
-    # ── 17. AI Summarizer (Uses Settings LLM: Ollama / LM Studio / OpenAI) ────
+    # ── 17. AI Summarizer (Token-by-Token Streaming via Settings LLM) ─────────
     @router.post("/api/pdf/ai-summarize")
     async def pdf_ai_summarize(
         file: UploadFile = File(...),
@@ -1234,6 +1270,7 @@ def build_extended_pdf_router(
         llm_base_url: str = Form(""),
         llm_model: str = Form(""),
         llm_api_key: str = Form(""),
+        stream: bool = Form(True),
         job_id: Optional[str] = Form(None),
     ):
         raw = await file.read()
@@ -1244,9 +1281,7 @@ def build_extended_pdf_router(
                 detail="Configure an LLM Model & Base URL (e.g. Ollama http://localhost:11434/v1) or API Key in Settings first.",
             )
 
-        def _run():
-            from openai import OpenAI
-
+        def _extract_text():
             doc = pymupdf.open(stream=raw, filetype="pdf")
             extracted: List[str] = []
             try:
@@ -1267,20 +1302,71 @@ def build_extended_pdf_router(
             full_text = "\n\n".join(extracted).strip()
             if not full_text:
                 raise ValueError("No readable text found in this PDF.")
+            return full_text[:45000], total
 
-            # Keep context safely within typical local LLM windows
-            clipped = full_text[:45000]
-            prompts = {
-                "executive": "Write a concise executive summary in Markdown with Key Takeaways, Main Arguments, and Actionable Conclusions.",
-                "bullets": "Summarize this document as crisp, well-organized Markdown bullet points grouped by topic.",
-                "study": "Create structured study notes in Markdown with definitions, key concepts, and review questions.",
-            }
-            instruction = prompts.get(style, prompts["executive"])
+        try:
+            clipped, total_pages = await asyncio.to_thread(_extract_text)
+        except job_cancelled_exc as exc:
+            job_finish(job_id, "cancelled", str(exc))
+            raise HTTPException(status_code=499, detail=str(exc))
+        except Exception as exc:
+            job_finish(job_id, "error", str(exc))
+            raise HTTPException(status_code=400 if isinstance(exc, ValueError) else 500, detail=str(exc))
 
-            job_update(job_id, total, total + 1, f"Generating summary via {llm_model.strip()}...")
+        prompts = {
+            "executive": "Write a concise executive summary in Markdown with Key Takeaways, Main Arguments, and Actionable Conclusions.",
+            "bullets": "Summarize this document as crisp, well-organized Markdown bullet points grouped by topic.",
+            "study": "Create structured study notes in Markdown with definitions, key concepts, and review questions.",
+        }
+        instruction = prompts.get(style, prompts["executive"])
+
+        if stream:
+            def _token_stream():
+                from openai import OpenAI
+
+                job_update(job_id, total_pages, total_pages + 1, f"Streaming tokens from {llm_model.strip()}...")
+                yield f"# AI Summary — {stem}\n\n".encode("utf-8")
+                client = OpenAI(
+                    api_key=llm_api_key.strip() or "ollama",
+                    base_url=llm_base_url.strip() or None,
+                    timeout=90.0,
+                )
+                try:
+                    resp = client.chat.completions.create(
+                        model=llm_model.strip(),
+                        messages=[
+                            {"role": "system", "content": "You are a precise document analyst. Respond in clean Markdown."},
+                            {"role": "user", "content": f"{instruction}\n\nDocument ({stem}.pdf):\n\n{clipped}"},
+                        ],
+                        temperature=0.2,
+                        stream=True,
+                    )
+                    for chunk in resp:
+                        job_check_cancel(job_id)
+                        delta = chunk.choices[0].delta.content if chunk.choices else None
+                        if delta:
+                            yield delta.encode("utf-8")
+                    job_finish(job_id, "done", f"AI summary streamed ({llm_model.strip()})")
+                except job_cancelled_exc:
+                    job_finish(job_id, "cancelled", "Cancelled by user.")
+                except Exception as exc:
+                    job_finish(job_id, "error", str(exc))
+                    yield f"\n\n> [Stream error: {exc}]".encode("utf-8")
+
+            return StreamingResponse(
+                _token_stream(),
+                media_type="text/markdown; charset=utf-8",
+                headers={"Content-Disposition": f'attachment; filename="{stem}_summary.md"'},
+            )
+
+        def _non_stream():
+            from openai import OpenAI
+
+            job_update(job_id, total_pages, total_pages + 1, f"Generating summary via {llm_model.strip()}...")
             client = OpenAI(
                 api_key=llm_api_key.strip() or "ollama",
                 base_url=llm_base_url.strip() or None,
+                timeout=90.0,
             )
             resp = client.chat.completions.create(
                 model=llm_model.strip(),
@@ -1295,7 +1381,7 @@ def build_extended_pdf_router(
             return summary_md
 
         try:
-            summary_md = await asyncio.to_thread(_run)
+            summary_md = await asyncio.to_thread(_non_stream)
             return StreamingResponse(
                 io.BytesIO(summary_md.encode("utf-8")),
                 media_type="text/markdown; charset=utf-8",
