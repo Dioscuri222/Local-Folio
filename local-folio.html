@@ -474,11 +474,15 @@
             <option value="converting">Processing</option>
             <option value="error">Errors</option>
           </select>
+          <label class="inline-flex items-center gap-1.5 min-h-[40px] px-3 text-xs font-medium rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-secondary)] hover:border-[var(--accent)] cursor-pointer select-none" title="When checked, uploading after a completed batch automatically starts a fresh session instead of appending">
+            <input type="checkbox" class="auto-session-toggle w-3.5 h-3.5 accent-[var(--accent)] cursor-pointer" checked />
+            <span>Auto New Session</span>
+          </label>
           <button id="download-zip-btn" type="button" class="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 text-xs font-semibold rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-fg)]">
             <i data-lucide="archive" class="w-4 h-4"></i><span>Export .ZIP</span>
           </button>
-          <button id="clear-queue-btn" type="button" class="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-3 text-xs font-medium rounded-xl text-[var(--ink-secondary)] hover:text-[var(--crimson)] bg-[var(--bg-elevated)] border border-[var(--border-hairline)]">
-            <i data-lucide="trash-2" class="w-4 h-4"></i><span>Clear</span>
+          <button id="clear-queue-btn" type="button" class="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-3 text-xs font-medium rounded-xl text-[var(--ink-secondary)] hover:text-[var(--crimson)] bg-[var(--bg-elevated)] border border-[var(--border-hairline)]" title="Reset and start a new session">
+            <i data-lucide="rotate-ccw" class="w-4 h-4"></i><span>New Session</span>
           </button>
         </div>
       </div>
@@ -575,12 +579,16 @@
           </div>
           <span id="ocr-batch-summary" class="text-xs sm:text-sm font-semibold text-[var(--ink-primary)]">Processed 0 of 0 images</span>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <label class="inline-flex items-center gap-1.5 min-h-[36px] px-3 text-xs font-medium rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-secondary)] hover:border-[var(--accent)] cursor-pointer select-none" title="When checked, uploading after a completed batch automatically starts a fresh session instead of appending">
+            <input type="checkbox" class="auto-session-toggle w-3.5 h-3.5 accent-[var(--accent)] cursor-pointer" checked />
+            <span>Auto New Session</span>
+          </label>
           <button id="ocr-export-zip-btn" type="button" class="inline-flex items-center gap-1.5 min-h-[36px] px-3.5 text-xs font-semibold rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-fg)]">
             <i data-lucide="archive" class="w-3.5 h-3.5"></i><span>Export All .ZIP</span>
           </button>
-          <button id="ocr-clear-queue-btn" type="button" class="inline-flex items-center gap-1.5 min-h-[36px] px-3 text-xs font-medium rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-secondary)] hover:text-[var(--crimson)]">
-            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i><span>Clear</span>
+          <button id="ocr-clear-queue-btn" type="button" class="inline-flex items-center gap-1.5 min-h-[36px] px-3 text-xs font-medium rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--ink-secondary)] hover:text-[var(--crimson)]" title="Reset and start a new OCR session">
+            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i><span>New Session</span>
           </button>
         </div>
       </div>
@@ -680,12 +688,20 @@
 
     <!-- State B: Focused Active Tool Workspace (Expands to 2-Col Live Preview Studio when files added) -->
     <div id="pdf-workspace-view" class="hidden max-w-3xl mx-auto space-y-6 t-view-enter transition-all duration-200">
-      <div class="flex items-center justify-between gap-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
         <button id="pdf-back-directory-btn" type="button" class="inline-flex items-center gap-2 min-h-[40px] px-3.5 text-xs font-semibold rounded-xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] hover:border-[var(--accent)] text-[var(--ink-primary)] transition-colors">
           <i data-lucide="arrow-left" class="w-4 h-4 text-[var(--accent)]"></i>
           <span>All PDF Tools</span>
         </button>
-        <button id="pdf-clear-files-btn" type="button" class="min-h-[40px] px-3 text-xs font-medium text-[var(--ink-muted)] hover:text-[var(--crimson)] transition-colors">Clear files</button>
+        <div class="flex items-center gap-2">
+          <label class="inline-flex items-center gap-1.5 min-h-[40px] px-3 text-xs font-medium rounded-xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] text-[var(--ink-secondary)] hover:border-[var(--accent)] cursor-pointer select-none" title="When checked, uploading after a completed task automatically starts a fresh session instead of appending">
+            <input type="checkbox" class="auto-session-toggle w-3.5 h-3.5 accent-[var(--accent)] cursor-pointer" checked />
+            <span>Auto New Session</span>
+          </label>
+          <button id="pdf-clear-files-btn" type="button" class="inline-flex items-center gap-1.5 min-h-[40px] px-3.5 text-xs font-medium rounded-xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] text-[var(--ink-secondary)] hover:text-[var(--crimson)] transition-colors" title="Reset and start a new PDF session">
+            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i><span>New Session</span>
+          </button>
+        </div>
       </div>
 
       <div class="text-center space-y-2">
@@ -1344,6 +1360,14 @@
             </div>
           </div>
 
+          <div class="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)]">
+            <div>
+              <label for="opt-auto-new-session" class="font-semibold text-[var(--ink-primary)] block">Auto New Session on Upload</label>
+              <p class="text-xs text-[var(--ink-muted)] mt-0.5">Start a fresh session when uploading after a completed batch (uncheck to append to existing queue)</p>
+            </div>
+            <input type="checkbox" id="opt-auto-new-session" checked class="w-5 h-5 accent-[var(--accent)] cursor-pointer flex-shrink-0" />
+          </div>
+
           <div class="p-3.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] space-y-2.5">
             <div class="flex items-center justify-between gap-3">
               <div>
@@ -1436,6 +1460,7 @@
     }
 
     const settings = {
+      autoNewSession: localStorage.getItem('folio-auto-new-session') !== 'false',
       enableFrontmatter: true,
       headingStyle: 'atx',
       codeFence: '```',
@@ -1446,6 +1471,22 @@
       llmModel: '',
       llmApiKey: ''
     };
+
+    function setAutoNewSession(val, notify = false) {
+      settings.autoNewSession = Boolean(val);
+      try { localStorage.setItem('folio-auto-new-session', String(settings.autoNewSession)); } catch (_) {}
+      const optBox = document.getElementById('opt-auto-new-session');
+      if (optBox) optBox.checked = settings.autoNewSession;
+      document.querySelectorAll('.auto-session-toggle').forEach(cb => { cb.checked = settings.autoNewSession; });
+      if (notify) {
+        showToast(
+          settings.autoNewSession
+            ? 'Auto New Session ON: New uploads replace completed batches'
+            : 'Auto New Session OFF: New uploads append to existing queue',
+          'info'
+        );
+      }
+    }
 
     let backendAvailable = false;
     let activeMainView = 'convert'; // 'convert' | 'ocr' | 'pdf'
@@ -1791,19 +1832,38 @@
 
     function addFilesToQueue(files) {
       if (!files || !files.length) return;
+      const isBatchCompleted = fileQueue.length > 0 && !isProcessing && fileQueue.every(i => i.status === 'done' || i.status === 'error');
+      const startedNew = settings.autoNewSession && isBatchCompleted;
+      if (startedNew) {
+        fileQueue = [];
+        activeFileId = null;
+        queueDisplayLimit = 50;
+      }
       const items = Array.from(files).map(file => ({
         id: 'f-' + Math.random().toString(36).slice(2, 10),
         file, url: null, status: 'pending', markdown: '', errorMsg: '', method: ''
       }));
       fileQueue = [...fileQueue, ...items];
-      if (!activeFileId) activeFileId = items[0].id;
+      if (!activeFileId || startedNew) activeFileId = items[0].id;
       updateUI();
-      showToast(`Queued ${items.length} file${items.length > 1 ? 's' : ''}`, 'info');
+      showToast(
+        startedNew
+          ? `Started new session (${items.length} file${items.length > 1 ? 's' : ''})`
+          : `Queued ${items.length} file${items.length > 1 ? 's' : ''}`,
+        'info'
+      );
       processQueue();
     }
 
     function addUrlToQueue(url) {
       if (!backendAvailable) { showToast('Start local server (local-folio.bat) for URL extraction', 'warning'); return; }
+      const isBatchCompleted = fileQueue.length > 0 && !isProcessing && fileQueue.every(i => i.status === 'done' || i.status === 'error');
+      const startedNew = settings.autoNewSession && isBatchCompleted;
+      if (startedNew) {
+        fileQueue = [];
+        activeFileId = null;
+        queueDisplayLimit = 50;
+      }
       // Prevent duplicate in-flight URL API calls
       if (fileQueue.some(i => i.url === url && (i.status === 'pending' || i.status === 'converting'))) {
         showToast('This URL is already queued', 'info');
@@ -1817,6 +1877,7 @@
       fileQueue = [...fileQueue, item];
       activeFileId = item.id;
       updateUI();
+      if (startedNew) showToast('Started new session for URL extraction', 'info');
       processQueue();
     }
 
@@ -2040,6 +2101,15 @@
         return;
       }
 
+      const isOcrBatchDone = ocrQueue.length > 0 && !isOcrProcessing && ocrQueue.every(i => i.status === 'done' || i.status === 'error');
+      const startedNew = settings.autoNewSession && isOcrBatchDone;
+      if (startedNew) {
+        ocrQueue.forEach(i => { if (i.previewUrl) URL.revokeObjectURL(i.previewUrl); });
+        ocrQueue = [];
+        activeOcrId = null;
+        ocrViewMode = 'single';
+      }
+
       const newItems = files.map(file => ({
         id: 'ocr-' + Math.random().toString(36).slice(2, 10),
         file,
@@ -2053,11 +2123,16 @@
       }));
 
       ocrQueue = [...ocrQueue, ...newItems];
-      if (!activeOcrId) activeOcrId = newItems[0].id;
+      if (!activeOcrId || startedNew) activeOcrId = newItems[0].id;
       if (ocrQueue.length > 1) ocrViewMode = 'combined';
 
       updateOcrUI();
-      showToast(`Queued ${newItems.length} file${newItems.length > 1 ? 's' : ''} for Batch OCR`, 'info');
+      showToast(
+        startedNew
+          ? `Started new OCR session (${newItems.length} file${newItems.length > 1 ? 's' : ''})`
+          : `Queued ${newItems.length} file${newItems.length > 1 ? 's' : ''} for Batch OCR`,
+        'info'
+      );
       processOcrQueue();
     }
 
@@ -3095,11 +3170,29 @@
       }
     }
 
+    let pdfSessionCompleted = false;
+
+    function resetPdfSession(silent = true) {
+      pdfSelectedFiles = [];
+      organizeThumbItems = [];
+      pdfPreviewPageLimit = 12;
+      pdfSessionCompleted = false;
+      pdfResultInfo.textContent = 'Ready to process';
+      const orgThumbs = document.getElementById('pdf-organize-thumbs');
+      if (orgThumbs) orgThumbs.classList.add('hidden');
+      const aiPrev = document.getElementById('pdf-ai-preview');
+      if (aiPrev) { aiPrev.classList.add('hidden'); aiPrev.innerHTML = ''; }
+      if (pdfToolInput) pdfToolInput.value = '';
+      renderPdfFileList();
+      if (!silent) showToast(`Started new ${PDF_TOOLS_META[activePdfTool]?.title || 'PDF'} session`, 'info');
+    }
+
     function selectPdfTool(toolId, openWorkspace = true) {
       activePdfTool = toolId;
       pdfSelectedFiles = [];
       organizeThumbItems = [];
       pdfPreviewPageLimit = 12;
+      pdfSessionCompleted = false;
       renderPdfFileList();
       const meta = PDF_TOOLS_META[toolId];
       document.getElementById('pdf-active-title').textContent = meta.title;
@@ -3156,9 +3249,26 @@
         const isImg = files[0].type.startsWith('image/');
         selectPdfTool(isImg ? 'from-images' : (files.length > 1 ? 'merge' : 'compress'), true);
       }
+      const startedNew = settings.autoNewSession && pdfSessionCompleted && pdfSelectedFiles.length > 0;
+      if (startedNew) {
+        pdfSelectedFiles = [];
+        organizeThumbItems = [];
+        pdfPreviewPageLimit = 12;
+        const orgThumbs = document.getElementById('pdf-organize-thumbs');
+        if (orgThumbs) orgThumbs.classList.add('hidden');
+        const aiPrev = document.getElementById('pdf-ai-preview');
+        if (aiPrev) { aiPrev.classList.add('hidden'); aiPrev.innerHTML = ''; }
+      }
+      pdfSessionCompleted = false;
+      pdfResultInfo.textContent = 'Ready to process';
       pdfSelectedFiles = PDF_TOOLS_META[activePdfTool].multiple ? [...pdfSelectedFiles, ...files] : files.slice(0, 1);
       renderPdfFileList();
-      showToast(`Added ${files.length} file${files.length > 1 ? 's' : ''} to ${PDF_TOOLS_META[activePdfTool].title}`, 'info');
+      showToast(
+        startedNew
+          ? `Started new session in ${PDF_TOOLS_META[activePdfTool].title} (${files.length} file${files.length > 1 ? 's' : ''})`
+          : `Added ${files.length} file${files.length > 1 ? 's' : ''} to ${PDF_TOOLS_META[activePdfTool].title}`,
+        'info'
+      );
       if (activePdfTool === 'organize' && pdfSelectedFiles[0]) {
         loadOrganizeThumbnails(pdfSelectedFiles[0]);
       }
@@ -3445,6 +3555,7 @@
         } else {
           pdfResultInfo.textContent = `Downloaded ${filename} (${formatBytes(blob.size)})`;
         }
+        pdfSessionCompleted = true;
         showToast(`Saved successfully: ${filename}`, 'success');
         updateSettingsProgress({
           active: false,
@@ -3687,7 +3798,14 @@
 
       queueSearch.addEventListener('input', debounce(renderQueueList, 120));
       statusFilter.addEventListener('change', renderQueueList);
-      document.getElementById('clear-queue-btn').addEventListener('click', () => { fileQueue = []; activeFileId = null; updateUI(); });
+      document.getElementById('clear-queue-btn').addEventListener('click', () => {
+        fileQueue = [];
+        activeFileId = null;
+        queueDisplayLimit = 50;
+        if (fileInput) fileInput.value = '';
+        updateUI();
+        showToast('Started new MarkItDown session', 'info');
+      });
       document.getElementById('download-zip-btn').addEventListener('click', async () => {
         const done = fileQueue.filter(i => i.status === 'done');
         if (!done.length) return;
@@ -3732,7 +3850,10 @@
         ocrQueue.forEach(i => { if (i.previewUrl) URL.revokeObjectURL(i.previewUrl); });
         ocrQueue = [];
         activeOcrId = null;
+        ocrViewMode = 'single';
+        if (ocrFileInput) ocrFileInput.value = '';
         updateOcrUI();
+        showToast('Started new OCR session', 'info');
       });
       document.getElementById('ocr-export-zip-btn').addEventListener('click', async () => {
         const done = ocrQueue.filter(i => i.status === 'done');
@@ -3810,7 +3931,17 @@
       pdfDropZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pdfToolInput.click(); } });
       document.getElementById('pdf-add-more-btn').addEventListener('click', () => pdfToolInput.click());
       pdfToolInput.addEventListener('change', e => { addFilesToPdfTool(e.target.files); pdfToolInput.value = ''; });
-      document.getElementById('pdf-clear-files-btn').addEventListener('click', () => { pdfSelectedFiles = []; renderPdfFileList(); });
+      document.getElementById('pdf-clear-files-btn').addEventListener('click', () => resetPdfSession(false));
+
+      // Sync Auto New Session checkboxes across Settings & all 3 workspace bars
+      setAutoNewSession(settings.autoNewSession, false);
+      const optAutoNew = document.getElementById('opt-auto-new-session');
+      if (optAutoNew) {
+        optAutoNew.addEventListener('change', (e) => setAutoNewSession(e.target.checked, true));
+      }
+      document.querySelectorAll('.auto-session-toggle').forEach(cb => {
+        cb.addEventListener('change', (e) => setAutoNewSession(e.target.checked, true));
+      });
 
       // Live real-time preview refresh (debounced on text input to prevent unnecessary re-renders)
       const pdfOptionsCard = document.getElementById('pdf-options-card');
@@ -3840,6 +3971,7 @@
       settingsModal.addEventListener('click', e => { if (e.target === settingsModal) closeModal(); });
       document.addEventListener('keydown', e => { if (e.key === 'Escape' && !settingsModal.classList.contains('hidden')) closeModal(); });
       document.getElementById('save-settings-btn').addEventListener('click', () => {
+        setAutoNewSession(document.getElementById('opt-auto-new-session').checked, false);
         settings.enableFrontmatter = document.getElementById('opt-frontmatter').checked;
         settings.headingStyle = document.getElementById('opt-heading-style').value;
         settings.codeFence = document.getElementById('opt-code-fence').value;
