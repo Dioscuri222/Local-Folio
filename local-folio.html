@@ -617,7 +617,7 @@
             <span id="ocr-file-label" class="truncate font-mono text-[var(--ink-primary)]">image.jpg</span>
             <button id="ocr-rerun-btn" type="button" class="px-3 py-1 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-hairline)] hover:border-[var(--accent)] text-[var(--accent)] font-medium shrink-0">Re-run OCR</button>
           </div>
-          <img id="ocr-preview-img" alt="Uploaded OCR preview" class="w-full max-h-[260px] object-contain rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-hairline)]" />
+          <img id="ocr-preview-img" alt="Uploaded OCR preview" title="Click to zoom" class="w-full max-h-[420px] object-contain rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-hairline)] cursor-zoom-in" />
         </div>
       </div>
 
@@ -695,19 +695,26 @@
 
       <div id="pdf-workspace-grid" class="grid grid-cols-1 gap-6 items-start">
         <!-- Left: Real-Time Visual Preview Stage (shown automatically when files are loaded) -->
-        <div id="pdf-preview-stage" class="hidden lg:col-span-7 rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] card-elevated p-4 sm:p-5 space-y-4">
+        <div id="pdf-preview-stage" class="hidden lg:col-span-8 rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] card-elevated p-4 sm:p-5 space-y-4">
           <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[var(--border-hairline)]">
             <div class="flex items-center gap-2 min-w-0">
               <i data-lucide="eye" class="w-4 h-4 text-[var(--accent)] shrink-0"></i>
               <span class="text-xs font-semibold text-[var(--ink-primary)]">Live Preview</span>
               <span id="pdf-preview-meta" class="text-[11px] font-mono px-2 py-0.5 rounded-md bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-[var(--accent)] truncate">Ready</span>
             </div>
-            <button id="pdf-add-more-btn" type="button" class="inline-flex items-center gap-1.5 min-h-[34px] px-3 text-xs font-semibold rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-strong)] hover:border-[var(--accent)] text-[var(--ink-primary)] transition-colors">
-              <i data-lucide="plus" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
-              <span>Add Files</span>
-            </button>
+            <div class="flex items-center gap-2">
+              <div id="pdf-preview-cols-bar" class="inline-flex items-center p-0.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)]" role="group" aria-label="Preview size">
+                <button type="button" data-cols="1" class="pdf-col-btn min-h-[28px] px-2.5 text-[11px] font-medium rounded-lg text-[var(--ink-muted)] hover:text-[var(--ink-primary)]" title="Large (1 per row)">Large</button>
+                <button type="button" data-cols="2" class="pdf-col-btn min-h-[28px] px-2.5 text-[11px] font-semibold rounded-lg bg-[var(--bg-panel)] text-[var(--accent)]" title="Medium (2 per row)">2 Col</button>
+                <button type="button" data-cols="3" class="pdf-col-btn min-h-[28px] px-2.5 text-[11px] font-medium rounded-lg text-[var(--ink-muted)] hover:text-[var(--ink-primary)]" title="Compact (3 per row)">3 Col</button>
+              </div>
+              <button id="pdf-add-more-btn" type="button" class="inline-flex items-center gap-1.5 min-h-[34px] px-3 text-xs font-semibold rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-strong)] hover:border-[var(--accent)] text-[var(--ink-primary)] transition-colors">
+                <i data-lucide="plus" class="w-3.5 h-3.5 text-[var(--accent)]"></i>
+                <span>Add Files</span>
+              </button>
+            </div>
           </div>
-          <div id="pdf-preview-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[640px] overflow-y-auto p-1"></div>
+          <div id="pdf-preview-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[76vh] overflow-y-auto p-1"></div>
           <p id="pdf-preview-hint" class="hidden text-[11px] text-[var(--ink-muted)] text-center font-mono"></p>
         </div>
 
@@ -1260,6 +1267,25 @@
       </div>
     </div>
   </section>
+
+  <!-- Full-Screen High-DPI Preview Lightbox Modal -->
+  <div id="preview-lightbox-modal" role="dialog" aria-modal="true" aria-label="Full-size preview" class="fixed inset-0 bg-black/75 backdrop-blur-xs z-50 hidden flex flex-col items-center justify-center p-4 sm:p-6">
+    <div class="w-full max-w-5xl max-h-[92vh] rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-strong)] card-elevated flex flex-col overflow-hidden">
+      <div class="px-4 py-3 bg-[var(--bg-elevated)] border-b border-[var(--border-hairline)] flex items-center justify-between gap-3">
+        <span id="lightbox-title" class="text-xs sm:text-sm font-mono font-semibold text-[var(--ink-primary)] truncate">Preview</span>
+        <div class="flex items-center gap-2 shrink-0">
+          <button id="lightbox-prev-btn" type="button" class="hidden min-h-[34px] px-3 text-xs font-semibold rounded-xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] hover:border-[var(--accent)] text-[var(--ink-primary)]">← Prev</button>
+          <button id="lightbox-next-btn" type="button" class="hidden min-h-[34px] px-3 text-xs font-semibold rounded-xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] hover:border-[var(--accent)] text-[var(--ink-primary)]">Next →</button>
+          <button id="lightbox-close-btn" type="button" class="inline-flex items-center justify-center min-h-[34px] min-w-[34px] rounded-xl bg-[var(--bg-panel)] border border-[var(--border-hairline)] hover:border-[var(--accent)] text-[var(--ink-secondary)] hover:text-[var(--ink-primary)]" aria-label="Close preview">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+      <div class="flex-grow overflow-auto p-4 sm:p-6 bg-[var(--bg-canvas)] flex items-center justify-center min-h-[320px]">
+        <img id="lightbox-img" alt="Zoomed preview" class="max-w-full max-h-[78vh] object-contain rounded-lg shadow-lg bg-white border border-black/10" />
+      </div>
+    </div>
+  </div>
 
   <!-- Feature Search Command Palette Modal -->
   <div id="feature-search-modal" role="dialog" aria-modal="true" aria-label="Search Local-Folio tools" class="fixed inset-0 bg-black/45 backdrop-blur-xs z-50 hidden flex items-start justify-center pt-16 sm:pt-24 px-4">
@@ -2601,7 +2627,7 @@
             const startPage = pages.length + 1;
             for (let i = startPage; i <= limit; i++) {
               const page = await pdf.getPage(i);
-              const vp = page.getViewport({ scale: 0.72 });
+              const vp = page.getViewport({ scale: 1.15 });
               const cv = document.createElement('canvas');
               cv.width = Math.max(1, Math.floor(vp.width));
               cv.height = Math.max(1, Math.floor(vp.height));
@@ -2640,6 +2666,69 @@
       }
     }
 
+    let pdfPreviewCols = 2; // 1 (Large), 2 (Medium - default), 3 (Compact)
+    let lightboxState = null; // { mode: 'image' | 'pdf', file, pageNum, totalPages, src, title }
+
+    function getPreviewGridColsClass() {
+      if (pdfPreviewCols === 1) return 'grid grid-cols-1 gap-5 max-h-[76vh] overflow-y-auto p-1';
+      if (pdfPreviewCols === 3) return 'grid grid-cols-2 sm:grid-cols-3 gap-3.5 max-h-[76vh] overflow-y-auto p-1';
+      return 'grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[76vh] overflow-y-auto p-1';
+    }
+
+    function setPreviewCols(cols) {
+      pdfPreviewCols = cols;
+      document.querySelectorAll('.pdf-col-btn').forEach(btn => {
+        const active = Number(btn.dataset.cols) === cols;
+        btn.className = active
+          ? 'pdf-col-btn min-h-[28px] px-2.5 text-[11px] font-semibold rounded-lg bg-[var(--bg-panel)] text-[var(--accent)]'
+          : 'pdf-col-btn min-h-[28px] px-2.5 text-[11px] font-medium rounded-lg text-[var(--ink-muted)] hover:text-[var(--ink-primary)]';
+      });
+      renderPdfLivePreview();
+    }
+
+    async function openPreviewLightbox({ title, src, pdfFile = null, pageNum = 1, totalPages = 1 }) {
+      const modal = document.getElementById('preview-lightbox-modal');
+      const imgEl = document.getElementById('lightbox-img');
+      const titleEl = document.getElementById('lightbox-title');
+      const prevBtn = document.getElementById('lightbox-prev-btn');
+      const nextBtn = document.getElementById('lightbox-next-btn');
+
+      lightboxState = { pdfFile, pageNum, totalPages, title };
+      titleEl.textContent = pdfFile ? `${title} — Page ${pageNum} of ${totalPages}` : title;
+      imgEl.src = src || '';
+      modal.classList.remove('hidden');
+
+      const showNav = Boolean(pdfFile && totalPages > 1);
+      prevBtn.classList.toggle('hidden', !showNav);
+      nextBtn.classList.toggle('hidden', !showNav);
+      prevBtn.disabled = pageNum <= 1;
+      nextBtn.disabled = pageNum >= totalPages;
+
+      // Upgrade PDF page to crisp high-DPI (scale 2.0) on demand inside Lightbox
+      if (pdfFile && window.pdfjsLib) {
+        try {
+          const buf = await pdfFile.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+          if (!lightboxState || lightboxState.pageNum !== pageNum) return;
+          const pg = await pdf.getPage(pageNum);
+          const vp = pg.getViewport({ scale: 2.0 });
+          const cv = document.createElement('canvas');
+          cv.width = Math.max(1, Math.floor(vp.width));
+          cv.height = Math.max(1, Math.floor(vp.height));
+          await pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+          if (lightboxState && lightboxState.pageNum === pageNum) {
+            imgEl.src = canvasToWebpOrJpeg(cv);
+          }
+        } catch (_) {}
+      }
+      refreshIcons();
+    }
+
+    function closePreviewLightbox() {
+      document.getElementById('preview-lightbox-modal').classList.add('hidden');
+      lightboxState = null;
+    }
+
     function updatePdfWorkspaceLayout() {
       const hasFiles = pdfSelectedFiles.length > 0;
       const wsView = document.getElementById('pdf-workspace-view');
@@ -2649,10 +2738,10 @@
       const dropZoneEl = document.getElementById('pdf-drop-zone');
 
       wsView.classList.toggle('max-w-3xl', !hasFiles);
-      wsView.classList.toggle('max-w-6xl', hasFiles);
+      wsView.classList.toggle('max-w-[1400px]', hasFiles);
       wsGrid.classList.toggle('lg:grid-cols-12', hasFiles);
       stage.classList.toggle('hidden', !hasFiles);
-      optsCard.classList.toggle('lg:col-span-5', hasFiles);
+      optsCard.classList.toggle('lg:col-span-4', hasFiles);
       optsCard.classList.toggle('lg:sticky', hasFiles);
       optsCard.classList.toggle('lg:top-24', hasFiles);
       dropZoneEl.classList.toggle('hidden', hasFiles);
@@ -2685,10 +2774,12 @@
         const items = await Promise.all(pdfSelectedFiles.map(f => ensureFilePreviewData(f)));
         if (seq !== pdfPreviewRenderSeq) return;
 
-        grid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[640px] overflow-y-auto p-1';
+        grid.className = getPreviewGridColsClass();
         grid.innerHTML = '';
 
-        const padPx = margin === 'none' ? 0 : (margin === 'small' ? 12 : 26);
+        const padPx = margin === 'none' ? 0 : (margin === 'small' ? 14 : 30);
+        const sheetMaxH = pdfPreviewCols === 1 ? '560px' : (pdfPreviewCols === 3 ? '240px' : '380px');
+        const sheetMinH = pdfPreviewCols === 1 ? '400px' : (pdfPreviewCols === 3 ? '210px' : '300px');
 
         items.forEach((info, idx) => {
           const f = pdfSelectedFiles[idx];
@@ -2707,20 +2798,23 @@
           const card = document.createElement('div');
           card.className = 'rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] p-3 flex flex-col gap-2.5';
           card.innerHTML = `
-            <div class="w-full flex items-center justify-center bg-[var(--bg-canvas)] rounded-xl p-3 min-h-[220px]">
-              <div class="bg-white shadow-md border border-black/10 overflow-hidden flex items-center justify-center transition-all duration-200" style="aspect-ratio: ${aspectRatio}; width: ${orient === 'landscape' ? '100%' : '76%'}; max-height: 250px; padding: ${padPx}px;">
-                <img src="${info.url}" alt="${escapeHtml(f.name)}" class="w-full h-full object-contain block" />
+            <div class="w-full flex items-center justify-center bg-[var(--bg-canvas)] rounded-xl p-3" style="min-height: ${sheetMinH};">
+              <div class="bg-white shadow-md border border-black/10 overflow-hidden flex items-center justify-center transition-all duration-200 cursor-zoom-in" data-zoom="1" style="aspect-ratio: ${aspectRatio}; width: ${orient === 'landscape' || pdfPreviewCols === 1 ? '96%' : '86%'}; max-height: ${sheetMaxH}; padding: ${padPx}px;">
+                <img src="${info.url}" alt="${escapeHtml(f.name)}" loading="lazy" decoding="async" class="w-full h-full object-contain block" />
               </div>
             </div>
             <div class="flex items-center justify-between gap-2 text-[11px]">
               <span class="font-mono text-[var(--ink-primary)] truncate">${idx + 1}. ${escapeHtml(f.name)}</span>
               <div class="flex items-center gap-1 shrink-0">
+                <button type="button" data-op="zoom" class="px-1.5 py-0.5 rounded bg-[var(--bg-panel)] border border-[var(--border-hairline)] text-[var(--ink-secondary)] hover:text-[var(--accent)]" title="Zoom full size">Zoom</button>
                 ${pdfSelectedFiles.length > 1 ? `<button type="button" data-op="up" class="px-1.5 py-0.5 rounded bg-[var(--bg-panel)] border border-[var(--border-hairline)] text-[var(--ink-secondary)] hover:text-[var(--accent)]" title="Move earlier">◀</button><button type="button" data-op="down" class="px-1.5 py-0.5 rounded bg-[var(--bg-panel)] border border-[var(--border-hairline)] text-[var(--ink-secondary)] hover:text-[var(--accent)]" title="Move later">▶</button>` : ''}
                 <button type="button" data-op="rm" class="px-1.5 py-0.5 rounded bg-[var(--bg-panel)] border border-[var(--border-hairline)] text-[var(--ink-muted)] hover:text-[var(--crimson)]" title="Remove">×</button>
               </div>
             </div>`;
+          card.querySelector('[data-zoom="1"]').addEventListener('click', () => openPreviewLightbox({ title: f.name, src: info.url }));
           card.querySelectorAll('button').forEach(b => {
             b.addEventListener('click', () => {
+              if (b.dataset.op === 'zoom') { openPreviewLightbox({ title: f.name, src: info.url }); return; }
               if (b.dataset.op === 'up' && idx > 0) [pdfSelectedFiles[idx - 1], pdfSelectedFiles[idx]] = [pdfSelectedFiles[idx], pdfSelectedFiles[idx - 1]];
               else if (b.dataset.op === 'down' && idx < pdfSelectedFiles.length - 1) [pdfSelectedFiles[idx + 1], pdfSelectedFiles[idx]] = [pdfSelectedFiles[idx], pdfSelectedFiles[idx + 1]];
               else if (b.dataset.op === 'rm') pdfSelectedFiles.splice(idx, 1);
@@ -2733,10 +2827,10 @@
         return;
       }
 
-        // 2. MULTI-PDF TOOLS (Merge, Compare, Workflow) — Cover thumbnail per PDF file
+      // 2. MULTI-PDF TOOLS (Merge, Compare, Workflow) — Cover thumbnail per PDF file
       if (['merge', 'compare', 'workflow'].includes(activePdfTool)) {
         metaEl.textContent = `${pdfSelectedFiles.length} PDF file${pdfSelectedFiles.length > 1 ? 's' : ''}`;
-        grid.className = 'grid grid-cols-2 sm:grid-cols-3 gap-3.5 max-h-[640px] overflow-y-auto p-1';
+        grid.className = getPreviewGridColsClass();
         if (pdfSelectedFiles.some(f => !pdfPreviewCache.has(f))) {
           grid.innerHTML = renderSkeletonCards(Math.min(6, pdfSelectedFiles.length));
         }
@@ -2751,19 +2845,24 @@
           const card = document.createElement('div');
           card.className = 'rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] p-2.5 flex flex-col gap-2';
           card.innerHTML = `
-            <div class="relative w-full aspect-[3/4] rounded-xl bg-white border border-[var(--border-hairline)] overflow-hidden flex items-center justify-center">
+            <div class="relative w-full aspect-[3/4] rounded-xl bg-white border border-[var(--border-hairline)] overflow-hidden flex items-center justify-center ${cover ? 'cursor-zoom-in' : ''}" data-zoom="1">
               ${cover ? `<img src="${cover}" alt="${escapeHtml(f.name)}" loading="lazy" decoding="async" class="w-full h-full object-contain" />` : `<i data-lucide="file-text" class="w-8 h-8 text-[var(--accent)]"></i>`}
               <span class="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-[var(--ink-primary)]/85 text-[var(--bg-panel)] text-[10px] font-mono">${info.totalPages ? info.totalPages + 'p' : 'PDF'}</span>
             </div>
             <div class="flex items-center justify-between gap-1 text-[11px]">
               <span class="font-mono text-[var(--ink-primary)] truncate">${idx + 1}. ${escapeHtml(f.name)}</span>
               <div class="flex items-center gap-0.5 shrink-0">
+                ${cover ? `<button type="button" data-op="zoom" class="px-1.5 py-0.5 rounded hover:bg-[var(--bg-panel)] text-[var(--accent)]" title="Zoom">Zoom</button>` : ''}
                 ${pdfSelectedFiles.length > 1 ? `<button type="button" data-op="up" class="px-1 rounded hover:bg-[var(--bg-panel)] text-[var(--ink-secondary)]">◀</button><button type="button" data-op="down" class="px-1 rounded hover:bg-[var(--bg-panel)] text-[var(--ink-secondary)]">▶</button>` : ''}
                 <button type="button" data-op="rm" class="px-1 rounded hover:bg-[var(--crimson-soft)] text-[var(--crimson)]">×</button>
               </div>
             </div>`;
+          if (cover) {
+            card.querySelector('[data-zoom="1"]').addEventListener('click', () => openPreviewLightbox({ title: f.name, src: cover, pdfFile: f, pageNum: 1, totalPages: info.totalPages || 1 }));
+          }
           card.querySelectorAll('button').forEach(b => {
             b.addEventListener('click', () => {
+              if (b.dataset.op === 'zoom' && cover) { openPreviewLightbox({ title: f.name, src: cover, pdfFile: f, pageNum: 1, totalPages: info.totalPages || 1 }); return; }
               if (b.dataset.op === 'up' && idx > 0) [pdfSelectedFiles[idx - 1], pdfSelectedFiles[idx]] = [pdfSelectedFiles[idx], pdfSelectedFiles[idx - 1]];
               else if (b.dataset.op === 'down' && idx < pdfSelectedFiles.length - 1) [pdfSelectedFiles[idx + 1], pdfSelectedFiles[idx]] = [pdfSelectedFiles[idx], pdfSelectedFiles[idx + 1]];
               else if (b.dataset.op === 'rm') pdfSelectedFiles.splice(idx, 1);
@@ -2797,7 +2896,7 @@
         grid.className = 'grid grid-cols-1 gap-3';
         grid.innerHTML = `
           <div class="rounded-2xl bg-[var(--bg-canvas)] border border-[var(--border-hairline)] p-4 flex justify-center">
-            <div class="bg-white shadow-md border border-black/10 overflow-hidden w-full max-w-[440px]" style="aspect-ratio: ${ratio}; padding: ${padPx}px;">
+            <div class="bg-white shadow-md border border-black/10 overflow-hidden w-full max-w-[640px]" style="aspect-ratio: ${ratio}; padding: ${padPx}px;">
               <iframe sandbox="" class="w-full h-full border-0 pointer-events-none" srcdoc="${escapeHtml(info.htmlText)}"></iframe>
             </div>
           </div>`;
@@ -2824,10 +2923,7 @@
       const pages = info.pages;
       metaEl.textContent = `${total} page${total > 1 ? 's' : ''}${total > pages.length ? ` (showing first ${pages.length})` : ''}`;
 
-      const singlePageFocus = ['watermark', 'page-numbers', 'crop', 'sign'].includes(activePdfTool);
-      grid.className = singlePageFocus
-        ? 'grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[640px] overflow-y-auto p-1'
-        : 'grid grid-cols-2 sm:grid-cols-3 gap-3.5 max-h-[640px] overflow-y-auto p-1';
+      grid.className = getPreviewGridColsClass();
       grid.innerHTML = '';
 
       // Compute active tool overlay parameters
@@ -2959,15 +3055,28 @@
             <img src="${pg.src}" alt="Page ${pNum}" loading="lazy" decoding="async" class="w-full h-full object-contain transition-transform duration-200" style="${isRotated ? `transform: rotate(${rotAngle}deg) scale(${rotAngle % 180 !== 0 ? 0.72 : 1});` : ''}" />
             ${overlayHtml}
           </div>
-          <div class="flex items-center justify-between text-[10px] font-mono px-0.5">
+          <div class="flex items-center justify-between text-[11px] font-mono px-1 pt-0.5">
             <span class="text-[var(--ink-primary)] font-semibold">Page ${pNum}</span>
-            ${isRotated ? `<span class="text-[var(--accent)]">${rotAngle}°</span>` : ''}
+            <div class="flex items-center gap-1.5">
+              ${isRotated ? `<span class="text-[var(--accent)]">${rotAngle}°</span>` : ''}
+              <button type="button" data-zoom-btn="1" class="px-2 py-0.5 rounded-md bg-[var(--bg-panel)] border border-[var(--border-hairline)] hover:border-[var(--accent)] text-[var(--accent)] text-[10px] font-sans font-semibold" title="Zoom high-resolution preview">Zoom</button>
+            </div>
           </div>`;
+
+        card.querySelector('[data-zoom-btn="1"]').addEventListener('click', (e) => {
+          e.stopPropagation();
+          openPreviewLightbox({ title: firstFile.name, src: pg.src, pdfFile: firstFile, pageNum: pNum, totalPages: total });
+        });
 
         if (activePdfTool === 'remove-pages') {
           card.addEventListener('click', () => togglePageInInput('pdf-remove-pages-input', pNum, total));
         } else if (activePdfTool === 'split') {
           card.addEventListener('click', () => togglePageInInput('pdf-split-pages', pNum, total));
+        } else {
+          card.querySelector('img').classList.add('cursor-zoom-in');
+          card.querySelector('img').addEventListener('click', () => {
+            openPreviewLightbox({ title: firstFile.name, src: pg.src, pdfFile: firstFile, pageNum: pNum, totalPages: total });
+          });
         }
 
         grid.appendChild(card);
@@ -3669,6 +3778,34 @@
         }
       });
       document.getElementById('pdf-back-directory-btn').addEventListener('click', showPdfDirectory);
+      document.querySelectorAll('.pdf-col-btn').forEach(btn => btn.addEventListener('click', () => setPreviewCols(Number(btn.dataset.cols))));
+
+      // Full-screen Lightbox modal controls + OCR image zoom
+      const lbModal = document.getElementById('preview-lightbox-modal');
+      document.getElementById('lightbox-close-btn').addEventListener('click', closePreviewLightbox);
+      lbModal.addEventListener('click', (e) => { if (e.target === lbModal) closePreviewLightbox(); });
+      document.getElementById('lightbox-prev-btn').addEventListener('click', () => {
+        if (lightboxState?.pdfFile && lightboxState.pageNum > 1) {
+          openPreviewLightbox({ ...lightboxState, pageNum: lightboxState.pageNum - 1, src: '' });
+        }
+      });
+      document.getElementById('lightbox-next-btn').addEventListener('click', () => {
+        if (lightboxState?.pdfFile && lightboxState.pageNum < lightboxState.totalPages) {
+          openPreviewLightbox({ ...lightboxState, pageNum: lightboxState.pageNum + 1, src: '' });
+        }
+      });
+      document.addEventListener('keydown', (e) => {
+        if (lbModal.classList.contains('hidden')) return;
+        if (e.key === 'Escape') closePreviewLightbox();
+        else if (e.key === 'ArrowLeft' && lightboxState?.pdfFile && lightboxState.pageNum > 1) {
+          openPreviewLightbox({ ...lightboxState, pageNum: lightboxState.pageNum - 1, src: '' });
+        } else if (e.key === 'ArrowRight' && lightboxState?.pdfFile && lightboxState.pageNum < lightboxState.totalPages) {
+          openPreviewLightbox({ ...lightboxState, pageNum: lightboxState.pageNum + 1, src: '' });
+        }
+      });
+      ocrPreviewImg.addEventListener('click', () => {
+        if (ocrPreviewImg.src) openPreviewLightbox({ title: ocrFileLabel.textContent || 'Image Preview', src: ocrPreviewImg.src });
+      });
       pdfDropZone.addEventListener('click', () => pdfToolInput.click());
       pdfDropZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pdfToolInput.click(); } });
       document.getElementById('pdf-add-more-btn').addEventListener('click', () => pdfToolInput.click());
