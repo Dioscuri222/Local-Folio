@@ -109,15 +109,57 @@ def _job_finish(job_id: Optional[str], status: str, detail: str) -> None:
                 job["current"] = job["total"]
             job["updated_at"] = time.time()
 
-# Lazy singleton for RapidOCR (Baidu PaddleOCR ONNX runtime)
+# Lazy thread-safe singleton for RapidOCR (auto-accelerates on CUDA / DirectML GPU when available)
 _ocr_engine: Optional[RapidOCR] = None
+_ocr_lock = threading.Lock()
+_ocr_infer_lock = threading.Lock()
 
 
 def get_ocr_engine() -> RapidOCR:
     global _ocr_engine
-    if _ocr_engine is None:
+    if _ocr_engine is not None:
+        return _ocr_engine
+
+    with _ocr_lock:
+        if _ocr_engine is not None:
+            return _ocr_engine
+
+        providers: List[str] = []
+        try:
+            import onnxruntime as ort
+
+            providers = list(ort.get_available_providers())
+        except Exception:
+            providers = []
+
+        # 1. Try NVIDIA CUDA GPU if onnxruntime-gpu + CUDA/cuDNN are available
+        if "CUDAExecutionProvider" in providers:
+            try:
+                engine = RapidOCR(det_use_cuda=True, cls_use_cuda=True, rec_use_cuda=True)
+                det_eps = engine.text_det.infer.session.get_providers()
+                if "CUDAExecutionProvider" in det_eps:
+                    _ocr_engine = engine
+                    print("[Local-Folio] RapidOCR backend: CUDAExecutionProvider (GPU)")
+                    return _ocr_engine
+            except Exception as exc:
+                print(f"[Local-Folio] CUDA GPU init skipped ({exc}); trying fallback...")
+
+        # 2. Try Windows DirectML GPU (works on NVIDIA, AMD, and Intel GPUs via DirectX 12)
+        if "DmlExecutionProvider" in providers:
+            try:
+                engine = RapidOCR(det_use_dml=True, cls_use_dml=True, rec_use_dml=True)
+                det_eps = engine.text_det.infer.session.get_providers()
+                if "DmlExecutionProvider" in det_eps:
+                    _ocr_engine = engine
+                    print("[Local-Folio] RapidOCR backend: DmlExecutionProvider (GPU)")
+                    return _ocr_engine
+            except Exception as exc:
+                print(f"[Local-Folio] DirectML GPU init skipped ({exc}); falling back to CPU...")
+
+        # 3. Reliable CPU fallback
         _ocr_engine = RapidOCR()
-    return _ocr_engine
+        print("[Local-Folio] RapidOCR backend: CPUExecutionProvider")
+        return _ocr_engine
 
 
 def build_frontmatter(filename: str, size: int, content_type: str, method: str) -> str:
@@ -207,12 +249,14 @@ def run_rapidocr_on_image(
     if rotate_mode in {"0", "90", "180", "270"}:
         deg = int(rotate_mode)
         rotated = base_img.rotate(-deg, expand=True) if deg else base_img
-        res, _ = engine(np.array(rotated))
+        with _ocr_infer_lock:
+            res, _ = engine(np.array(rotated))
         _, lines, avg_conf = _score_ocr_result(res)
         return "\n".join(lines), deg, avg_conf, len(lines)
 
     # Auto mode: test 0 deg first; only retry rotated orientations if boxes are vertical or very weak
-    res0, _ = engine(np.array(base_img))
+    with _ocr_infer_lock:
+        res0, _ = engine(np.array(base_img))
     best_score, best_lines, best_conf = _score_ocr_result(res0)
     best_deg = 0
 
@@ -235,7 +279,8 @@ def run_rapidocr_on_image(
     if needs_rotation_check:
         for deg in (90, 270, 180):
             rotated = base_img.rotate(-deg, expand=True)
-            res, _ = engine(np.array(rotated))
+            with _ocr_infer_lock:
+                res, _ = engine(np.array(rotated))
             score, lines, conf = _score_ocr_result(res)
             if score > best_score * 1.08:
                 best_score, best_lines, best_conf, best_deg = score, lines, conf, deg
