@@ -1042,6 +1042,59 @@ def build_extended_pdf_router(
             raise HTTPException(status_code=500, detail=str(exc))
 
     # ── 12–14. Word / PowerPoint / Excel to PDF ───────────────────────────────
+    # Small LRU cache of converted Office PDFs: the Live Preview conversion is reused
+    # by the real "Convert" click (same bytes + same options => instant result).
+    _office_pdf_cache: OrderedDict = OrderedDict()
+    _office_cache_lock = threading.Lock()
+    _office_convert_lock = threading.Lock()  # Serialize COM/LibreOffice launches
+    _OFFICE_CACHE_MAX = 8
+
+    def _office_pdf_cached(raw: bytes, ext: str, stem: str, app_type: str, quality: str, orientation: str, fit_columns: bool) -> bytes:
+        key = f"{hashlib.sha256(raw).hexdigest()}|{app_type}|{quality}|{orientation}|{int(bool(fit_columns))}"
+        with _office_cache_lock:
+            hit = _office_pdf_cache.get(key)
+            if hit is not None:
+                _office_pdf_cache.move_to_end(key)
+                return hit
+        with _office_convert_lock:
+            with _office_cache_lock:
+                hit = _office_pdf_cache.get(key)
+            if hit is not None:
+                return hit
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                in_path = Path(tmp_dir) / f"input{ext}"
+                out_path = Path(tmp_dir) / f"{stem or 'document'}.pdf"
+                in_path.write_bytes(raw)
+                _convert_office_to_pdf_sync(
+                    in_path, out_path, app_type,
+                    quality=quality, orientation=orientation, fit_columns=fit_columns,
+                )
+                pdf_bytes = out_path.read_bytes()
+        with _office_cache_lock:
+            _office_pdf_cache[key] = pdf_bytes
+            _office_pdf_cache.move_to_end(key)
+            while len(_office_pdf_cache) > _OFFICE_CACHE_MAX:
+                _office_pdf_cache.popitem(last=False)
+        return pdf_bytes
+
+    @router.post("/api/preview/office")
+    async def preview_office(file: UploadFile = File(...)):
+        """Render a Word/PowerPoint/Excel file to PDF for the real-time Live Preview."""
+        raw = await file.read()
+        orig_name = file.filename or "document.docx"
+        ext = Path(orig_name).suffix.lower()
+        app_type = {".doc": "word", ".docx": "word", ".ppt": "powerpoint", ".pptx": "powerpoint", ".xls": "excel", ".xlsx": "excel"}.get(ext)
+        if not app_type:
+            raise HTTPException(status_code=400, detail=f"Unsupported preview type: {ext or 'unknown'}")
+        try:
+            pdf_bytes = await asyncio.to_thread(
+                _office_pdf_cached, raw, ext, Path(orig_name).stem, app_type,
+                "standard", "auto", app_type == "excel",
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+        return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf")
+
     async def _handle_office_to_pdf(
         file: UploadFile,
         app_type: str,
@@ -1057,20 +1110,8 @@ def build_extended_pdf_router(
 
         def _run():
             job_init(job_id, total=2, detail=f"Converting {orig_name} via local {app_type.title()} engine...")
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                in_path = Path(tmp_dir) / f"input{ext}"
-                out_path = Path(tmp_dir) / f"{stem}.pdf"
-                in_path.write_bytes(raw)
-                job_update(job_id, 1, 2, f"Rendering {orig_name} to PDF...")
-                _convert_office_to_pdf_sync(
-                    in_path,
-                    out_path,
-                    app_type,
-                    quality=quality,
-                    orientation=orientation,
-                    fit_columns=fit_columns,
-                )
-                pdf_bytes = out_path.read_bytes()
+            job_update(job_id, 1, 2, f"Rendering {orig_name} to PDF...")
+            pdf_bytes = _office_pdf_cached(raw, ext.lower(), stem, app_type, quality, orientation, fit_columns)
             job_finish(job_id, "done", f"Converted {orig_name} to PDF")
             return pdf_bytes
 

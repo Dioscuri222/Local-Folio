@@ -2692,11 +2692,27 @@
           return entry;
         }
 
-        if (nameLower.endsWith('.pdf') && window.pdfjsLib) {
+        const isOfficeDoc = /\.(docx?|pptx?|xlsx?)$/.test(nameLower);
+        if ((nameLower.endsWith('.pdf') || (isOfficeDoc && backendAvailable)) && window.pdfjsLib) {
           try {
             const existing = pdfPreviewCache.get(file);
-            const buf = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+            let buf = existing && existing.pdfBuf ? existing.pdfBuf : null;
+            if (!buf) {
+              if (isOfficeDoc) {
+                // Real content preview: render Word/PowerPoint/Excel to PDF on the local server
+                const fd = new FormData();
+                fd.append('file', file);
+                const res = await fetch(`${API_BASE}/api/preview/office`, { method: 'POST', body: fd });
+                if (!res.ok) {
+                  const errData = await res.json().catch(() => ({}));
+                  throw new Error(errData.detail || `Preview failed (${res.status})`);
+                }
+                buf = await res.arrayBuffer();
+              } else {
+                buf = await file.arrayBuffer();
+              }
+            }
+            const pdf = await pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
             const total = pdf.numPages;
             const limit = Math.min(total, maxPages);
             const pages = existing && existing.kind === 'pdf' ? [...existing.pages] : [];
@@ -2710,11 +2726,13 @@
               await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
               pages.push({ page: i, src: canvasToWebpOrJpeg(cv), w: vp.width, h: vp.height });
             }
-            const entry = { kind: 'pdf', totalPages: total, pages, renderedLimit: maxPages };
+            const entry = { kind: 'pdf', totalPages: total, pages, renderedLimit: maxPages, pdfBuf: buf, isOffice: isOfficeDoc };
             pdfPreviewCache.set(file, entry);
             return entry;
           } catch (err) {
-            const entry = { kind: 'pdf-locked', totalPages: 0, pages: [], error: err.message || 'Encrypted or unreadable PDF' };
+            const entry = isOfficeDoc
+              ? { kind: 'doc', ext: (nameLower.split('.').pop() || 'file').toUpperCase(), error: err.message || 'Preview unavailable' }
+              : { kind: 'pdf-locked', totalPages: 0, pages: [], error: err.message || 'Encrypted or unreadable PDF' };
             pdfPreviewCache.set(file, entry);
             return entry;
           }
@@ -2783,7 +2801,8 @@
       // Upgrade PDF page to crisp high-DPI (scale 2.0) on demand inside Lightbox
       if (pdfFile && window.pdfjsLib) {
         try {
-          const buf = await pdfFile.arrayBuffer();
+          const cachedPdf = pdfPreviewCache.get(pdfFile);
+          const buf = cachedPdf?.pdfBuf ? cachedPdf.pdfBuf.slice(0) : await pdfFile.arrayBuffer();
           const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
           if (!lightboxState || lightboxState.pageNum !== pageNum) return;
           const pg = await pdf.getPage(pageNum);
@@ -2956,6 +2975,9 @@
       if (!pdfPreviewCache.has(firstFile)) {
         grid.className = 'grid grid-cols-2 sm:grid-cols-3 gap-3.5 max-h-[640px] overflow-y-auto p-1';
         grid.innerHTML = renderSkeletonCards(6);
+        if (/\.(docx?|pptx?|xlsx?)$/i.test(firstFile.name) && backendAvailable) {
+          metaEl.textContent = 'Rendering document preview...';
+        }
       }
       const info = await ensureFilePreviewData(firstFile, pdfPreviewPageLimit);
       if (seq !== pdfPreviewRenderSeq) return;
@@ -2988,7 +3010,7 @@
               <i data-lucide="${info.kind === 'pdf-locked' ? 'lock' : 'file-text'}" class="w-7 h-7"></i>
             </div>
             <p class="text-sm font-semibold text-[var(--ink-primary)] truncate">${escapeHtml(firstFile.name)}</p>
-            <p class="text-xs font-mono text-[var(--ink-muted)]">${formatBytes(firstFile.size)} ${info.kind === 'pdf-locked' ? '• Password-protected (enter password to unlock)' : '• Ready for native local PDF conversion'}</p>
+            <p class="text-xs font-mono text-[var(--ink-muted)]">${formatBytes(firstFile.size)} ${info.kind === 'pdf-locked' ? '• Password-protected (enter password to unlock)' : (info.error ? `• Preview unavailable: ${escapeHtml(info.error)}` : '• Ready for native local PDF conversion')}</p>
           </div>`;
         refreshIcons();
         return;
@@ -2997,7 +3019,7 @@
       // PDF Page-by-Page Real-Time Visual Preview with Tool-Specific Overlays!
       const total = info.totalPages;
       const pages = info.pages;
-      metaEl.textContent = `${total} page${total > 1 ? 's' : ''}${total > pages.length ? ` (showing first ${pages.length})` : ''}`;
+      metaEl.textContent = `${info.isOffice ? 'Document • ' : ''}${total} page${total > 1 ? 's' : ''}${total > pages.length ? ` (showing first ${pages.length})` : ''}`;
 
       grid.className = getPreviewGridColsClass();
       grid.innerHTML = '';
@@ -3050,7 +3072,8 @@
       let displayPages = pages;
       if (activePdfTool === 'sign' && signPageSpec === 'last' && total > pages.length && window.pdfjsLib) {
         try {
-          const buf = await firstFile.arrayBuffer();
+          const cachedPdf = pdfPreviewCache.get(firstFile);
+          const buf = cachedPdf?.pdfBuf ? cachedPdf.pdfBuf.slice(0) : await firstFile.arrayBuffer();
           const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
           const lp = await pdf.getPage(total);
           const vp = lp.getViewport({ scale: 0.72 });
