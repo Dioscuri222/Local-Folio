@@ -2629,6 +2629,7 @@
     const pdfPreviewInFlight = new WeakMap(); // Deduplicates concurrent renders for the same File
     let pdfPreviewRenderSeq = 0;
     let pdfPreviewPageLimit = 12;
+    let pdfPreviewFileIdx = 0; // Which file the single-file Live Preview shows during batch
 
     function canvasToWebpOrJpeg(cv) {
       const webp = cv.toDataURL('image/webp', 0.80);
@@ -2951,7 +2952,7 @@
       }
 
       // 3. SINGLE FILE TOOLS (PDF / HTML / Office)
-      const firstFile = pdfSelectedFiles[0];
+      const firstFile = pdfSelectedFiles[Math.min(pdfPreviewFileIdx, pdfSelectedFiles.length - 1)] || pdfSelectedFiles[0];
       if (!pdfPreviewCache.has(firstFile)) {
         grid.className = 'grid grid-cols-2 sm:grid-cols-3 gap-3.5 max-h-[640px] overflow-y-auto p-1';
         grid.innerHTML = renderSkeletonCards(6);
@@ -3176,6 +3177,7 @@
       pdfSelectedFiles = [];
       organizeThumbItems = [];
       pdfPreviewPageLimit = 12;
+      pdfPreviewFileIdx = 0;
       pdfSessionCompleted = false;
       pdfResultInfo.textContent = 'Ready to process';
       const orgThumbs = document.getElementById('pdf-organize-thumbs');
@@ -3192,6 +3194,7 @@
       pdfSelectedFiles = [];
       organizeThumbItems = [];
       pdfPreviewPageLimit = 12;
+      pdfPreviewFileIdx = 0;
       pdfSessionCompleted = false;
       renderPdfFileList();
       const meta = PDF_TOOLS_META[toolId];
@@ -3200,11 +3203,11 @@
       document.getElementById('pdf-run-label').textContent = meta.btn;
       document.getElementById('pdf-input-hint').textContent = meta.optionalFile
         ? `Accepts ${meta.accept} (or enter a URL below)`
-        : `Accepts ${meta.accept} (${meta.multiple ? 'multiple files' : 'single file'})`;
+        : `Accepts ${meta.accept} (${meta.multiple ? 'multiple files' : 'multiple files, batch processed into .ZIP'})`;
       pdfToolInput.accept = meta.accept;
-      pdfToolInput.multiple = meta.multiple;
+      pdfToolInput.multiple = true;
       const addMoreSpan = document.querySelector('#pdf-add-more-btn span');
-      if (addMoreSpan) addMoreSpan.textContent = meta.multiple ? 'Add Files' : 'Change File';
+      if (addMoreSpan) addMoreSpan.textContent = 'Add Files';
       pdfResultInfo.textContent = 'Ready to process';
 
       const optionIds = [
@@ -3246,8 +3249,14 @@
       const files = Array.from(fileList || []);
       if (!files.length) return;
       if (!pdfInWorkspace) {
-        const isImg = files[0].type.startsWith('image/');
-        selectPdfTool(isImg ? 'from-images' : (files.length > 1 ? 'merge' : 'compress'), true);
+        const ext = (files[0].name.split('.').pop() || '').toLowerCase();
+        const autoTool = files[0].type.startsWith('image/') ? 'from-images'
+          : ['doc', 'docx'].includes(ext) ? 'word-to-pdf'
+          : ['ppt', 'pptx'].includes(ext) ? 'pptx-to-pdf'
+          : ['xls', 'xlsx'].includes(ext) ? 'excel-to-pdf'
+          : ['html', 'htm'].includes(ext) ? 'html-to-pdf'
+          : (files.length > 1 ? 'merge' : 'compress');
+        selectPdfTool(autoTool, true);
       }
       const startedNew = settings.autoNewSession && pdfSessionCompleted && pdfSelectedFiles.length > 0;
       if (startedNew) {
@@ -3261,7 +3270,8 @@
       }
       pdfSessionCompleted = false;
       pdfResultInfo.textContent = 'Ready to process';
-      pdfSelectedFiles = PDF_TOOLS_META[activePdfTool].multiple ? [...pdfSelectedFiles, ...files] : files.slice(0, 1);
+      // All tools accept multiple files: multi-input tools combine them, single-input tools batch-process each
+      pdfSelectedFiles = [...pdfSelectedFiles, ...files];
       renderPdfFileList();
       showToast(
         startedNew
@@ -3278,18 +3288,25 @@
       pdfFileList.innerHTML = '';
       pdfFileList.classList.toggle('hidden', pdfSelectedFiles.length === 0);
       const multi = pdfSelectedFiles.length > 1;
+      const isBatchTool = multi && !['merge', 'from-images', 'compare', 'workflow'].includes(activePdfTool);
+      if (pdfPreviewFileIdx >= pdfSelectedFiles.length) pdfPreviewFileIdx = 0;
       pdfSelectedFiles.forEach((f, idx) => {
         const row = document.createElement('div');
-        row.className = 'flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] text-xs';
+        const isPreviewing = isBatchTool && idx === pdfPreviewFileIdx;
+        row.className = `flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-[var(--bg-elevated)] border ${isPreviewing ? 'border-[var(--accent)]' : 'border-[var(--border-hairline)]'} text-xs`;
         row.innerHTML = `
           <span class="truncate text-[var(--ink-primary)] font-mono">${idx + 1}. ${escapeHtml(f.name)} (${formatBytes(f.size)})</span>
           <div class="flex items-center gap-1.5 shrink-0">
+            ${isBatchTool ? `<button type="button" data-op="preview" class="px-1.5 py-0.5 rounded-md border ${isPreviewing ? 'bg-[var(--accent)] text-[var(--accent-fg)] border-[var(--accent)]' : 'bg-[var(--bg-panel)] border-[var(--border-hairline)] text-[var(--ink-secondary)] hover:text-[var(--accent)]'}" title="Show in Live Preview">${isPreviewing ? 'Previewing' : 'Preview'}</button>` : ''}
             ${multi ? `<button type="button" data-op="up" class="px-1.5 py-0.5 rounded-md bg-[var(--bg-panel)] border border-[var(--border-hairline)] text-[var(--ink-secondary)] hover:text-[var(--accent)]" title="Move up">↑</button><button type="button" data-op="down" class="px-1.5 py-0.5 rounded-md bg-[var(--bg-panel)] border border-[var(--border-hairline)] text-[var(--ink-secondary)] hover:text-[var(--accent)]" title="Move down">↓</button>` : ''}
             <button type="button" data-op="rm" class="text-[var(--ink-muted)] hover:text-[var(--crimson)] font-medium pl-1">Remove</button>
           </div>`;
         row.querySelectorAll('button').forEach(b => {
           b.addEventListener('click', () => {
-            if (b.dataset.op === 'up' && idx > 0) {
+            if (b.dataset.op === 'preview') {
+              pdfPreviewFileIdx = idx;
+              pdfPreviewPageLimit = 12;
+            } else if (b.dataset.op === 'up' && idx > 0) {
               [pdfSelectedFiles[idx - 1], pdfSelectedFiles[idx]] = [pdfSelectedFiles[idx], pdfSelectedFiles[idx - 1]];
             } else if (b.dataset.op === 'down' && idx < pdfSelectedFiles.length - 1) {
               [pdfSelectedFiles[idx + 1], pdfSelectedFiles[idx]] = [pdfSelectedFiles[idx], pdfSelectedFiles[idx + 1]];
@@ -3320,7 +3337,6 @@
 
       const runBtn = document.getElementById('pdf-run-btn');
       const cancelBtn = document.getElementById('pdf-cancel-btn');
-      const jobId = generateJobId();
       let cancelledByUser = false;
 
       runBtn.disabled = true;
@@ -3346,32 +3362,41 @@
         'pdf-to-pdfa', 'ai-summarize', 'workflow'
       ].includes(activePdfTool);
 
-      if (supportsLivePages) {
-        startJobProgressPolling(jobId, (p) => {
-          if (p.total > 0) {
-            const label = p.detail || `Step ${p.current} of ${p.total}`;
-            pdfResultInfo.textContent = `${label} (${p.pct}%)`;
-            updateSettingsProgress({
-              active: true,
-              title: `Running: ${meta.title}`,
-              detail: label,
-              pct: p.pct,
-              counts: `${p.current}/${p.total}`,
-              indeterminate: false
-            });
-          } else if (p.detail) {
-            pdfResultInfo.textContent = p.detail;
-          }
-        });
-      }
+      // Batch mode: single-file tools run once per file, results bundled into one .ZIP
+      const multiFieldTools = ['merge', 'from-images', 'compare', 'workflow'];
+      const isMultiField = multiFieldTools.includes(activePdfTool);
+      const runQueue = (isMultiField || !pdfSelectedFiles.length) ? [null] : [...pdfSelectedFiles];
+      const isBatch = runQueue.length > 1;
+      const batchLabel = (bi) => isBatch ? `[${bi + 1}/${runQueue.length}] ` : '';
 
-      try {
+      async function processOne(curFile, bi) {
+        const jobId = generateJobId();
+        if (supportsLivePages) {
+          startJobProgressPolling(jobId, (p) => {
+            const pre = batchLabel(bi);
+            if (p.total > 0) {
+              const label = pre + (p.detail || `Step ${p.current} of ${p.total}`);
+              pdfResultInfo.textContent = `${label} (${p.pct}%)`;
+              updateSettingsProgress({
+                active: true,
+                title: `Running: ${meta.title}${isBatch ? ' (Batch)' : ''}`,
+                detail: label,
+                pct: isBatch ? Math.round(((bi + p.pct / 100) / runQueue.length) * 100) : p.pct,
+                counts: isBatch ? `${bi}/${runQueue.length} files` : `${p.current}/${p.total}`,
+                indeterminate: false
+              });
+            } else if (p.detail) {
+              pdfResultInfo.textContent = pre + p.detail;
+            }
+          });
+        }
+
+        try {
         const fd = new FormData();
-        const multiFieldTools = ['merge', 'from-images', 'compare', 'workflow'];
-        if (multiFieldTools.includes(activePdfTool)) {
+        if (isMultiField) {
           pdfSelectedFiles.forEach(f => fd.append('files', f));
-        } else if (pdfSelectedFiles[0]) {
-          fd.append('file', pdfSelectedFiles[0]);
+        } else if (curFile) {
+          fd.append('file', curFile);
         }
 
         if (supportsLivePages) fd.append('job_id', jobId);
@@ -3529,6 +3554,71 @@
           blob = await res.blob();
         }
 
+        return { blob, filename, res };
+        } finally {
+          stopJobProgressPolling();
+          if (activeJobId === jobId) activeJobId = null;
+        }
+      }
+
+      try {
+        const outputs = [];
+        const failures = [];
+        for (let bi = 0; bi < runQueue.length; bi++) {
+          if (cancelledByUser) break;
+          const curFile = runQueue[bi];
+          if (isBatch) {
+            pdfResultInfo.textContent = `${batchLabel(bi)}Processing ${curFile.name}...`;
+            updateSettingsProgress({
+              active: true,
+              title: `Running: ${meta.title} (Batch)`,
+              detail: `${batchLabel(bi)}${curFile.name}`,
+              pct: Math.max(4, Math.round((bi / runQueue.length) * 100)),
+              counts: `${bi}/${runQueue.length} files`,
+              indeterminate: false
+            });
+          }
+          try {
+            outputs.push(await processOne(curFile, bi));
+          } catch (e) {
+            if (!isBatch || e.name === 'AbortError' || cancelledByUser) throw e;
+            failures.push({ name: curFile.name, msg: e.message || 'Failed' });
+          }
+        }
+        if (cancelledByUser) throw new DOMException('Cancelled', 'AbortError');
+        if (!outputs.length) throw new Error(failures.length ? `All ${failures.length} files failed: ${failures[0].msg}` : 'No output produced');
+
+        if (isBatch) {
+          const zip = new JSZip();
+          const used = new Set();
+          outputs.forEach(o => {
+            let name = o.filename;
+            let k = 2;
+            while (used.has(name)) name = o.filename.replace(/(\.[^.]+)?$/, `_${k++}$1`);
+            used.add(name);
+            zip.file(name, o.blob);
+          });
+          if (failures.length) zip.file('_ERRORS.txt', failures.map(f => `${f.name}: ${f.msg}`).join('\n'));
+          const zipBlob = await zip.generateAsync({ type: 'blob' });
+          const zipName = `local-folio_${activePdfTool}_batch_${outputs.length}-files.zip`;
+          const zLink = document.createElement('a');
+          zLink.href = URL.createObjectURL(zipBlob);
+          zLink.download = zipName;
+          zLink.click();
+          pdfResultInfo.textContent = `Downloaded ${zipName} (${outputs.length}/${runQueue.length} files${failures.length ? `, ${failures.length} failed` : ''}, ${formatBytes(zipBlob.size)})`;
+          pdfSessionCompleted = true;
+          showToast(failures.length ? `Batch done: ${outputs.length} ok, ${failures.length} failed (see _ERRORS.txt)` : `Batch done: ${outputs.length} files saved as .ZIP`, failures.length ? 'warning' : 'success');
+          updateSettingsProgress({
+            active: false,
+            title: `Completed: ${meta.title} (Batch)`,
+            detail: `Downloaded ${zipName}`,
+            pct: 100,
+            counts: `${outputs.length}/${runQueue.length} files`
+          });
+          return;
+        }
+
+        const { blob, filename, res } = outputs[0];
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
         link.download = filename;
