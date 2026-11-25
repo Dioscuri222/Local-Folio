@@ -27,3 +27,6 @@ dist/
 Thumbs.db
 .vscode/
 .idea/
+
+# Hugging Face Spaces deployment bundle (kept local, not pushed to GitHub)
+hf-space/

@@ -23,6 +23,15 @@ from rapidocr_onnxruntime import RapidOCR
 APP_DIR = Path(__file__).resolve().parent
 HTML_PATH = APP_DIR / "local-folio.html"
 
+DEPLOY_MODE = os.environ.get("FOLIO_DEPLOY_MODE", "offline").strip().lower()
+IS_ONLINE_MODE = DEPLOY_MODE == "online"
+ONLINE_MAX_FILES = int(os.environ.get("FOLIO_MAX_FILES", "5"))
+ONLINE_MAX_FILE_MB = float(os.environ.get("FOLIO_MAX_FILE_MB", "10"))
+ONLINE_MAX_FILE_BYTES = int(ONLINE_MAX_FILE_MB * 1024 * 1024)
+OFFLINE_DOWNLOAD_URL = os.environ.get(
+    "FOLIO_OFFLINE_URL", "https://github.com/Dioscuri222/Local-Folio"
+)
+
 app = FastAPI(title="Local-Folio — Local PDF, OCR & Markdown Suite")
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -48,6 +57,17 @@ app.add_middleware(
 
 @app.middleware("http")
 async def add_server_timing_and_trace(request: Request, call_next):
+    if IS_ONLINE_MODE and request.method == "POST" and request.url.path.startswith("/api/"):
+        # Hard guard on total HTTP body size in online mode (allows multi-file overhead)
+        cl = request.headers.get("content-length")
+        max_req_bytes = ONLINE_MAX_FILES * ONLINE_MAX_FILE_BYTES + (2 * 1024 * 1024)
+        if cl and cl.isdigit() and int(cl) > max_req_bytes:
+            return JSONResponse(
+                status_code=413,
+                content={
+                    "detail": f"Online mode limit exceeded: max {ONLINE_MAX_FILES} files and < {int(ONLINE_MAX_FILE_MB)} MB per file. Download the offline version for unlimited usage."
+                },
+            )
     t0 = time.perf_counter()
     response = await call_next(request)
     dur_ms = (time.perf_counter() - t0) * 1000.0
@@ -394,6 +414,12 @@ async def health_check():
     return {
         "status": "ok",
         "engine": "local-folio",
+        "deploy_mode": "online" if IS_ONLINE_MODE else "offline",
+        "limits": {
+            "max_files": ONLINE_MAX_FILES,
+            "max_file_mb": ONLINE_MAX_FILE_MB,
+        } if IS_ONLINE_MODE else None,
+        "offline_url": OFFLINE_DOWNLOAD_URL,
         "features": ["microsoft-markitdown", "rapidocr-onnx", "pdf-tools", "live-progress"],
     }
 
