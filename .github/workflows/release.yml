@@ -1,0 +1,37 @@
+name: Build & Publish Offline Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Package Local-Folio-Offline.zip
+        run: |
+          mkdir -p dist/Local-Folio
+          cp local_folio_server.py pdf_extended_routes.py local-folio.html local-folio.bat requirements.txt README.md dist/Local-Folio/
+          cd dist
+          zip -r ../Local-Folio-Offline.zip Local-Folio/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: Local-Folio ${{ github.event.inputs.tag || github.ref_name }} (Unlimited Offline)
+          generate_release_notes: true
+          files: Local-Folio-Offline.zip

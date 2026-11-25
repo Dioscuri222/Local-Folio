@@ -2,6 +2,13 @@
 
 **Local-Folio** is a 100% local, privacy-first web suite for **document-to-Markdown conversion**, **offline batch OCR (including rotated photos & scanned PDFs)**, and a **29-tool iLovePDF-style PDF Studio** - with zero file-count limits and zero cloud uploads.
 
+## Download & Try Online
+
+- **One-Click Offline Download (Unlimited, GPU-Accelerated):**
+  **[Download `Local-Folio-Offline.zip` (Latest Release)](https://github.com/Dioscuri222/Local-Folio/releases/latest/download/Local-Folio-Offline.zip)** — Extract the `.zip` and double-click **`local-folio.bat`** on Windows (auto-installs Python dependencies on first run).
+- **All Releases:** [GitHub Releases](https://github.com/Dioscuri222/Local-Folio/releases)
+- **Try Online Demo (No Install):** [Hugging Face Static Space](https://huggingface.co/spaces/Dioscuri222/local-folio) *(limited to 5 files & <10 MB per file; browser-side tools only)*
+
 ## Problem & Solution
 
 - **Problem:** Most online PDF and OCR tools cap batch uploads (often 2-3 files), require uploading sensitive documents to third-party servers, and fail on scanned PDFs or rotated phone photos of screens and documents.
