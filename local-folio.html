@@ -2665,16 +2665,46 @@
       renderPdfLivePreview();
     }
 
-    async function ensureFilePreviewData(file, maxPages = 12) {
+    function parsePageOrderClient(str, total) {
+      const s = (str || '').trim().toLowerCase();
+      if (!s) return [];
+      if (s === 'reverse') return Array.from({ length: total }, (_, i) => total - i);
+      const out = [];
+      s.split(',').forEach(part => {
+        const tok = part.trim();
+        if (!tok) return;
+        if (tok.includes('-')) {
+          const [a, b] = tok.split('-').map(x => parseInt(x.trim(), 10));
+          if (!isNaN(a) && !isNaN(b)) {
+            const step = a <= b ? 1 : -1;
+            for (let p = a; step > 0 ? p <= b : p >= b; p += step) {
+              if (p >= 1 && p <= total) out.push(p);
+            }
+          }
+        } else {
+          const p = parseInt(tok, 10);
+          if (!isNaN(p) && p >= 1 && p <= total) out.push(p);
+        }
+      });
+      return out;
+    }
+
+    async function ensureFilePreviewData(file, maxPages = 12, targetPages = null) {
+      const requestedTargets = targetPages
+        ? Array.from(targetPages).filter(p => Number.isInteger(p) && p >= 1).slice(0, 24)
+        : [];
+
       if (pdfPreviewCache.has(file)) {
         const cached = pdfPreviewCache.get(file);
-        if (cached.kind !== 'pdf' || cached.renderedLimit >= maxPages || cached.pages.length >= cached.totalPages) {
-          return cached;
-        }
+        if (cached.kind !== 'pdf') return cached;
+        const hasBase = cached.renderedLimit >= maxPages || cached.pageMap.size >= cached.totalPages;
+        const missingTarget = requestedTargets.some(p => p <= cached.totalPages && !cached.pageMap.has(p));
+        if (hasBase && !missingTarget) return cached;
       }
       if (pdfPreviewInFlight.has(file)) {
         const pending = pdfPreviewInFlight.get(file);
-        if (pending.maxPages >= maxPages) return pending.promise;
+        const sameTargets = requestedTargets.every(p => pending.targets.has(p));
+        if (pending.maxPages >= maxPages && sameTargets) return pending.promise;
       }
 
       const workPromise = (async () => {
@@ -2715,18 +2745,42 @@
             const pdf = await pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
             const total = pdf.numPages;
             const limit = Math.min(total, maxPages);
-            const pages = existing && existing.kind === 'pdf' ? [...existing.pages] : [];
-            const startPage = pages.length + 1;
-            for (let i = startPage; i <= limit; i++) {
+            const pageMap = (existing && existing.kind === 'pdf' && existing.pageMap) ? new Map(existing.pageMap) : new Map();
+
+            const toRender = [];
+            for (let i = 1; i <= limit; i++) {
+              if (!pageMap.has(i)) toRender.push(i);
+            }
+            for (const p of requestedTargets) {
+              if (p >= 1 && p <= total && !pageMap.has(p) && !toRender.includes(p)) {
+                toRender.push(p);
+              }
+            }
+
+            for (const i of toRender) {
               const page = await pdf.getPage(i);
               const vp = page.getViewport({ scale: 1.15 });
               const cv = document.createElement('canvas');
               cv.width = Math.max(1, Math.floor(vp.width));
               cv.height = Math.max(1, Math.floor(vp.height));
               await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
-              pages.push({ page: i, src: canvasToWebpOrJpeg(cv), w: vp.width, h: vp.height });
+              let textLower = '';
+              try {
+                const tc = await page.getTextContent();
+                textLower = tc.items.map(it => it.str).join(' ').toLowerCase();
+              } catch (_) {}
+              pageMap.set(i, { page: i, src: canvasToWebpOrJpeg(cv), w: vp.width, h: vp.height, textLower });
             }
-            const entry = { kind: 'pdf', totalPages: total, pages, renderedLimit: maxPages, pdfBuf: buf, isOffice: isOfficeDoc };
+            const pages = Array.from({ length: limit }, (_, idx) => pageMap.get(idx + 1)).filter(Boolean);
+            const entry = {
+              kind: 'pdf',
+              totalPages: total,
+              pageMap,
+              pages,
+              renderedLimit: Math.max(existing?.renderedLimit || 0, maxPages),
+              pdfBuf: buf,
+              isOffice: isOfficeDoc
+            };
             pdfPreviewCache.set(file, entry);
             return entry;
           } catch (err) {
@@ -2750,7 +2804,7 @@
         return entry;
       })();
 
-      pdfPreviewInFlight.set(file, { maxPages, promise: workPromise });
+      pdfPreviewInFlight.set(file, { maxPages, targets: new Set(requestedTargets), promise: workPromise });
       try {
         return await workPromise;
       } finally {
@@ -3016,19 +3070,15 @@
         return;
       }
 
-      // PDF Page-by-Page Real-Time Visual Preview with Tool-Specific Overlays!
-      const total = info.totalPages;
-      const pages = info.pages;
-      metaEl.textContent = `${info.isOffice ? 'Document • ' : ''}${total} page${total > 1 ? 's' : ''}${total > pages.length ? ` (showing first ${pages.length})` : ''}`;
+      // PDF Page-by-Page Real-Time Visual Preview with Tool-Specific Overlays & On-Demand Range Rendering
+      let total = info.totalPages;
 
-      grid.className = getPreviewGridColsClass();
-      grid.innerHTML = '';
-
-      // Compute active tool overlay parameters
+      // Compute active tool overlay & range parameters
       const rotAngle = Number(document.getElementById('pdf-rotate-angle')?.value || 90);
       const rotPages = parsePageRangeClient(document.getElementById('pdf-rotate-pages')?.value || '', total);
       const rmPages = parsePageRangeClient(document.getElementById('pdf-remove-pages-input')?.value || '', total);
       const splitPages = parsePageRangeClient(document.getElementById('pdf-split-pages')?.value || '', total);
+      const splitMode = document.getElementById('pdf-split-mode')?.value || 'single';
       const rangeInputMap = { 'to-images': 'pdf-img-pages', 'to-word': 'pdf-word-pages', 'to-pptx': 'pdf-pptx-pages' };
       const highlightRange = rangeInputMap[activePdfTool]
         ? parsePageRangeClient(document.getElementById(rangeInputMap[activePdfTool])?.value || '', total)
@@ -3037,11 +3087,13 @@
       const wmText = (document.getElementById('pdf-wm-text')?.value || 'CONFIDENTIAL').trim();
       const wmOpacity = Number(document.getElementById('pdf-wm-opacity')?.value || 0.25);
       const wmAngle = Number(document.getElementById('pdf-wm-angle')?.value || 45);
+      const wmSize = Math.max(12, Math.min(120, Number(document.getElementById('pdf-wm-size')?.value || 44)));
       const wmPos = document.getElementById('pdf-wm-pos')?.value || 'center';
 
       const pnPos = document.getElementById('pdf-pn-pos')?.value || 'bottom-center';
       const pnFmt = document.getElementById('pdf-pn-fmt')?.value || 'page_of';
       const pnStart = Number(document.getElementById('pdf-pn-start')?.value || 1);
+      const pnSize = Math.max(8, Math.min(28, Number(document.getElementById('pdf-pn-size')?.value || 11)));
 
       const cropUnit = document.getElementById('pdf-crop-unit')?.value || 'mm';
       const cropTop = Number(document.getElementById('pdf-crop-top')?.value || 0);
@@ -3057,31 +3109,162 @@
       const signWidth = Math.max(10, Math.min(60, Number(document.getElementById('pdf-sign-width')?.value || 24)));
       const signPageSet = signPageSpec === 'all' ? null : (signPageSpec === 'last' ? new Set([total]) : parsePageRangeClient(signPageSpec, total));
 
-      if (activePdfTool === 'remove-pages') {
-        hintEl.textContent = 'Tip: Click any page below to toggle removal';
-        hintEl.classList.remove('hidden');
-      } else if (activePdfTool === 'split') {
-        hintEl.textContent = 'Tip: Click any page below to include/exclude from extraction';
-        hintEl.classList.remove('hidden');
-      } else if (activePdfTool === 'rotate') {
-        hintEl.textContent = `Live preview: rotating ${rotPages.size ? 'selected pages' : 'all pages'} by ${rotAngle}° clockwise`;
-        hintEl.classList.remove('hidden');
+      const orgOrderList = activePdfTool === 'organize'
+        ? parsePageOrderClient(document.getElementById('pdf-organize-order')?.value || '', total)
+        : [];
+
+      const redactTerms = activePdfTool === 'redact'
+        ? (document.getElementById('pdf-redact-terms')?.value || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean)
+        : [];
+      const redactColor = document.getElementById('pdf-redact-color')?.value || 'black';
+
+      // Determine any out-of-window target pages that need on-demand rendering (e.g. pages 131-137 of 302)
+      let desiredTargetList = [];
+      if (activePdfTool === 'split' && splitPages.size > 0) {
+        desiredTargetList = Array.from(splitPages).sort((a, b) => a - b);
+      } else if (activePdfTool === 'remove-pages' && rmPages.size > 0) {
+        desiredTargetList = Array.from(rmPages).sort((a, b) => a - b);
+      } else if (activePdfTool === 'rotate' && rotPages.size > 0) {
+        desiredTargetList = Array.from(rotPages).sort((a, b) => a - b);
+      } else if (activePdfTool === 'crop' && cropPages.size > 0) {
+        desiredTargetList = Array.from(cropPages).sort((a, b) => a - b);
+      } else if (highlightRange.size > 0) {
+        desiredTargetList = Array.from(highlightRange).sort((a, b) => a - b);
+      } else if (activePdfTool === 'sign' && signPageSet && signPageSet.size > 0) {
+        desiredTargetList = Array.from(signPageSet).sort((a, b) => a - b);
+      } else if (activePdfTool === 'organize' && orgOrderList.length > 0) {
+        desiredTargetList = orgOrderList;
       }
 
-      // For Sign PDF on last page when total > 12, make sure the last page is visible!
+      if (desiredTargetList.length && info.pageMap) {
+        const missing = desiredTargetList.slice(0, 24).filter(p => p >= 1 && p <= total && !info.pageMap.has(p));
+        if (missing.length) {
+          metaEl.textContent = `Rendering selected page${missing.length > 1 ? 's' : ''}...`;
+          info = await ensureFilePreviewData(firstFile, pdfPreviewPageLimit, missing);
+          if (seq !== pdfPreviewRenderSeq) return;
+          total = info.totalPages;
+        }
+      }
+
+      const pages = info.pages;
+      const getPageObj = (pNum) => info.pageMap?.get(pNum) || pages.find(p => p.page === pNum);
+
+      // Build displayPages list: if user typed a specific range (e.g. 131-137), show those exact pages!
       let displayPages = pages;
-      if (activePdfTool === 'sign' && signPageSpec === 'last' && total > pages.length && window.pdfjsLib) {
-        try {
-          const cachedPdf = pdfPreviewCache.get(firstFile);
-          const buf = cachedPdf?.pdfBuf ? cachedPdf.pdfBuf.slice(0) : await firstFile.arrayBuffer();
-          const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-          const lp = await pdf.getPage(total);
-          const vp = lp.getViewport({ scale: 0.72 });
-          const cv = document.createElement('canvas');
-          cv.width = Math.max(1, Math.floor(vp.width)); cv.height = Math.max(1, Math.floor(vp.height));
-          await lp.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
-          displayPages = [pages[0], { page: total, src: cv.toDataURL('image/jpeg', 0.82), w: vp.width, h: vp.height }];
-        } catch (_) {}
+      let showingTargetedSubset = false;
+      if (activePdfTool === 'split' && splitPages.size > 0) {
+        displayPages = desiredTargetList.slice(0, 24).map(getPageObj).filter(Boolean);
+        showingTargetedSubset = true;
+      } else if (['rotate', 'crop', 'to-images', 'to-word', 'to-pptx'].includes(activePdfTool) && desiredTargetList.length > 0) {
+        displayPages = desiredTargetList.slice(0, 24).map(getPageObj).filter(Boolean);
+        showingTargetedSubset = true;
+      } else if (activePdfTool === 'remove-pages' && rmPages.size > 0) {
+        const hasFarPages = desiredTargetList.some(p => p > pages.length);
+        if (hasFarPages) {
+          const picked = desiredTargetList.slice(0, 24).map(getPageObj).filter(Boolean);
+          const extra = pages.filter(p => !rmPages.has(p.page)).slice(0, Math.max(0, 12 - picked.length));
+          displayPages = [...picked, ...extra];
+          showingTargetedSubset = true;
+        }
+      } else if (activePdfTool === 'organize' && orgOrderList.length > 0) {
+        displayPages = orgOrderList.slice(0, 24).map((pNum, orderIdx) => {
+          const pg = getPageObj(pNum);
+          return pg ? { ...pg, newOrder: orderIdx + 1 } : null;
+        }).filter(Boolean);
+        showingTargetedSubset = true;
+      } else if (activePdfTool === 'sign' && signPageSet && signPageSet.size > 0 && !(signPageSpec === 'last' && total > pages.length)) {
+        const hasFarSign = desiredTargetList.some(p => p > pages.length);
+        if (hasFarSign) {
+          displayPages = desiredTargetList.slice(0, 24).map(getPageObj).filter(Boolean);
+          showingTargetedSubset = true;
+        }
+      }
+
+      if (showingTargetedSubset) {
+        const totalSel = activePdfTool === 'organize' ? orgOrderList.length : desiredTargetList.length;
+        metaEl.textContent = `${totalSel} of ${total} page${total > 1 ? 's' : ''} selected${totalSel > displayPages.length ? ` (showing first ${displayPages.length})` : ''}`;
+      } else {
+        metaEl.textContent = `${info.isOffice ? 'Document • ' : ''}${total} page${total > 1 ? 's' : ''}${total > pages.length ? ` (showing first ${pages.length})` : ''}`;
+      }
+
+      grid.className = getPreviewGridColsClass();
+      grid.innerHTML = '';
+
+      // Live Action / Output Preview Banner per tool
+      if (activePdfTool === 'split') {
+        const count = splitPages.size > 0 ? splitPages.size : total;
+        const outDesc = splitMode === 'each' ? `${count} separate PDFs (.ZIP)` : `1 PDF (${count} page${count > 1 ? 's' : ''})`;
+        hintEl.textContent = splitPages.size > 0
+          ? `Output preview: Extracting ${count} selected page${count > 1 ? 's' : ''} → ${outDesc} • Click a page to remove`
+          : `Output preview: All ${total} pages → ${outDesc} • Click any page below to pick a range`;
+        hintEl.classList.remove('hidden');
+      } else if (activePdfTool === 'remove-pages') {
+        const rem = Math.max(0, total - rmPages.size);
+        hintEl.textContent = rmPages.size > 0
+          ? `Output preview: Removing ${rmPages.size} page${rmPages.size > 1 ? 's' : ''} → ${rem} page${rem !== 1 ? 's' : ''} remaining • Click a page to toggle`
+          : 'Click any page below (or type page numbers) to mark pages for removal';
+        hintEl.classList.remove('hidden');
+      } else if (activePdfTool === 'rotate') {
+        hintEl.textContent = `Live preview: Rotating ${rotPages.size ? `${rotPages.size} selected page(s)` : `all ${total} pages`} by ${rotAngle}° clockwise`;
+        hintEl.classList.remove('hidden');
+      } else if (activePdfTool === 'crop') {
+        hintEl.textContent = `Live preview: Cropping ${cropPages.size ? `${cropPages.size} selected page(s)` : `all ${total} pages`} (T:${cropTop} R:${cropRight} B:${cropBottom} L:${cropLeft} ${cropUnit})`;
+        hintEl.classList.remove('hidden');
+      } else if (activePdfTool === 'watermark') {
+        hintEl.textContent = wmText
+          ? `Live preview: "${wmText}" (${Math.round(wmOpacity * 100)}% opacity, ${wmAngle}°, ${wmSize}pt)`
+          : 'Enter watermark text to preview';
+        hintEl.classList.remove('hidden');
+      } else if (activePdfTool === 'page-numbers') {
+        hintEl.textContent = `Live preview: Numbering ${total} pages starting at #${pnStart} (${pnPos.replace('-', ' ')})`;
+        hintEl.classList.remove('hidden');
+      } else if (activePdfTool === 'sign') {
+        hintEl.textContent = signDataUrl
+          ? `Live preview: Signature stamped on ${signPageSpec === 'all' ? 'all pages' : signPageSpec === 'last' ? `last page (p.${total})` : `page(s) ${signPageSpec}`}`
+          : 'Draw your signature on the pad to see it stamped on the preview';
+        hintEl.classList.remove('hidden');
+      } else if (activePdfTool === 'organize') {
+        hintEl.textContent = orgOrderList.length > 0
+          ? `Output preview: Reordered sequence (${orgOrderList.length} page${orgOrderList.length > 1 ? 's' : ''})`
+          : `Drag thumbnails in Organize panel or type order (e.g. 3, 1, 2 or reverse)`;
+        hintEl.classList.remove('hidden');
+      } else if (activePdfTool === 'redact') {
+        hintEl.textContent = redactTerms.length > 0
+          ? `Live preview: Redacting ${redactTerms.length} term(s) permanently with ${redactColor} fill`
+          : 'Enter sensitive words/phrases to scan and redact';
+        hintEl.classList.remove('hidden');
+      } else if (activePdfTool === 'to-images') {
+        const fmt = (document.getElementById('pdf-img-format')?.value || 'png').toUpperCase();
+        const dpi = document.getElementById('pdf-img-dpi')?.value || '150';
+        const cnt = highlightRange.size > 0 ? highlightRange.size : total;
+        hintEl.textContent = `Output preview: ${cnt} page${cnt > 1 ? 's' : ''} → ${fmt} @ ${dpi} DPI (.ZIP)`;
+        hintEl.classList.remove('hidden');
+      } else if (activePdfTool === 'to-word') {
+        const cnt = highlightRange.size > 0 ? highlightRange.size : total;
+        hintEl.textContent = `Output preview: ${cnt} page${cnt > 1 ? 's' : ''} → Editable Word (.docx)`;
+        hintEl.classList.remove('hidden');
+      } else if (activePdfTool === 'to-pptx') {
+        const dpi = document.getElementById('pdf-pptx-dpi')?.value || '150';
+        const cnt = highlightRange.size > 0 ? highlightRange.size : total;
+        hintEl.textContent = `Output preview: ${cnt} page${cnt > 1 ? 's' : ''} → PowerPoint slides (${dpi} DPI)`;
+        hintEl.classList.remove('hidden');
+      } else if (activePdfTool === 'compress') {
+        const lvl = getOptTileValue('compress-level', 'recommended');
+        hintEl.textContent = `Output preview: Compressing ${total} page(s) with "${lvl}" preset`;
+        hintEl.classList.remove('hidden');
+      } else if (activePdfTool === 'protect') {
+        const canPrint = document.getElementById('pdf-protect-print')?.checked ? 'Allowed' : 'Blocked';
+        const canCopy = document.getElementById('pdf-protect-copy')?.checked ? 'Allowed' : 'Blocked';
+        hintEl.textContent = `Output preview: Encrypting ${total} page(s) (Print: ${canPrint}, Copy: ${canCopy})`;
+        hintEl.classList.remove('hidden');
+      } else if (activePdfTool === 'pdf-to-pdfa') {
+        const conf = document.getElementById('pdf-pdfa-conformance')?.value || '2b';
+        hintEl.textContent = `Output preview: Archival PDF/A-${conf} conversion (${total} pages)`;
+        hintEl.classList.remove('hidden');
+      } else if (activePdfTool === 'ocr-pdf') {
+        const mode = document.getElementById('pdf-ocr-mode')?.value || 'hybrid';
+        hintEl.textContent = `Output preview: Running ${mode === 'hybrid' ? 'Smart Hybrid' : 'Force RapidOCR'} across ${total} page(s)`;
+        hintEl.classList.remove('hidden');
       }
 
       displayPages.forEach(pg => {
@@ -3092,10 +3275,11 @@
         const isRotated = activePdfTool === 'rotate' && (rotPages.size === 0 || rotPages.has(pNum));
         const isCropped = activePdfTool === 'crop' && (cropPages.size === 0 || cropPages.has(pNum));
         const isSigned = activePdfTool === 'sign' && signDataUrl && (signPageSet === null || signPageSet.has(pNum));
+        const hasRedactMatch = activePdfTool === 'redact' && redactTerms.length > 0 && pg.textLower && redactTerms.some(t => pg.textLower.includes(t));
 
         let borderCls = 'border-[var(--border-hairline)]';
         if (isRemoved) borderCls = 'border-[var(--crimson)] border-dashed opacity-55';
-        else if ((activePdfTool === 'split' && splitPages.size > 0 && isSplitPicked) || isRangePicked) borderCls = 'border-[var(--accent)] ring-2 ring-[var(--accent-soft)]';
+        else if ((activePdfTool === 'split' && splitPages.size > 0 && isSplitPicked) || isRangePicked || hasRedactMatch) borderCls = 'border-[var(--accent)] ring-2 ring-[var(--accent-soft)]';
 
         const card = document.createElement('div');
         card.className = `rounded-xl bg-[var(--bg-elevated)] border ${borderCls} p-2 flex flex-col gap-1.5 transition-all ${['remove-pages', 'split'].includes(activePdfTool) ? 'cursor-pointer hover:border-[var(--accent)]' : ''}`;
@@ -3105,7 +3289,8 @@
 
         if (activePdfTool === 'watermark' && wmText) {
           const topPct = wmPos === 'top' ? '15%' : wmPos === 'bottom' ? '85%' : '50%';
-          overlayHtml += `<div class="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center"><span style="position:absolute; top:${topPct}; left:50%; transform:translate(-50%,-50%) rotate(${-wmAngle}deg); opacity:${wmOpacity}; color:#593d29; font-weight:700; font-size:16px; white-space:nowrap; letter-spacing:0.06em;">${escapeHtml(wmText)}</span></div>`;
+          const scaledFont = Math.max(10, Math.round(wmSize * 0.36));
+          overlayHtml += `<div class="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center"><span style="position:absolute; top:${topPct}; left:50%; transform:translate(-50%,-50%) rotate(${-wmAngle}deg); opacity:${wmOpacity}; color:#593d29; font-weight:700; font-size:${scaledFont}px; white-space:nowrap; letter-spacing:0.06em;">${escapeHtml(wmText)}</span></div>`;
         }
 
         if (activePdfTool === 'page-numbers') {
@@ -3117,7 +3302,8 @@
             : pnPos === 'top-right' ? 'top:6px; right:8px;'
             : pnPos === 'top-center' ? 'top:6px; left:50%; transform:translateX(-50%);'
             : 'bottom:6px; left:50%; transform:translateX(-50%);';
-          overlayHtml += `<span class="absolute pointer-events-none px-1.5 py-0.5 rounded bg-white/85 text-[#3b2c22] font-mono text-[9px] font-semibold" style="${posStyle}">${escapeHtml(lbl)}</span>`;
+          const scaledPn = Math.max(8, Math.round(pnSize * 0.85));
+          overlayHtml += `<span class="absolute pointer-events-none px-1.5 py-0.5 rounded bg-white/85 text-[#3b2c22] font-mono font-semibold" style="${posStyle} font-size:${scaledPn}px;">${escapeHtml(lbl)}</span>`;
         }
 
         if (isCropped) {
@@ -3145,8 +3331,12 @@
 
         if (isRemoved) {
           overlayHtml += `<span class="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-[var(--crimson)] text-white text-[9px] font-bold">Remove</span>`;
-        } else if (activePdfTool === 'split' && splitPages.size > 0 && isSplitPicked) {
-          overlayHtml += `<span class="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-[var(--accent)] text-[var(--accent-fg)] text-[9px] font-bold">Extract</span>`;
+        } else if (activePdfTool === 'split' && (splitPages.size > 0 || splitMode === 'each') && isSplitPicked) {
+          overlayHtml += `<span class="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-[var(--accent)] text-[var(--accent-fg)] text-[9px] font-bold">${splitMode === 'each' ? `PDF #${pNum}` : 'Extract'}</span>`;
+        } else if (isRangePicked) {
+          overlayHtml += `<span class="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-[var(--accent)] text-[var(--accent-fg)] text-[9px] font-bold">Selected</span>`;
+        } else if (hasRedactMatch) {
+          overlayHtml += `<span class="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-[var(--crimson)] text-white text-[9px] font-bold">Term match</span>`;
         }
 
         card.innerHTML = `
@@ -3155,7 +3345,7 @@
             ${overlayHtml}
           </div>
           <div class="flex items-center justify-between text-[11px] font-mono px-1 pt-0.5">
-            <span class="text-[var(--ink-primary)] font-semibold">Page ${pNum}</span>
+            <span class="text-[var(--ink-primary)] font-semibold">${pg.newOrder ? `#${pg.newOrder} (p.${pNum})` : `Page ${pNum}`}</span>
             <div class="flex items-center gap-1.5">
               ${isRotated ? `<span class="text-[var(--accent)]">${rotAngle}°</span>` : ''}
               <button type="button" data-zoom-btn="1" class="px-2 py-0.5 rounded-md bg-[var(--bg-panel)] border border-[var(--border-hairline)] hover:border-[var(--accent)] text-[var(--accent)] text-[10px] font-sans font-semibold" title="Zoom high-resolution preview">Zoom</button>
@@ -3181,7 +3371,7 @@
         grid.appendChild(card);
       });
 
-      if (total > pages.length && activePdfTool !== 'sign') {
+      if (!showingTargetedSubset && total > pages.length && activePdfTool !== 'sign') {
         const moreBtn = document.createElement('button');
         moreBtn.type = 'button';
         moreBtn.className = 'col-span-full py-2.5 px-4 text-xs font-semibold rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-hairline)] hover:border-[var(--accent)] text-[var(--accent)] transition-colors';
