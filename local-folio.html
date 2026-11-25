@@ -36,6 +36,7 @@
   <script defer src="https://unpkg.com/turndown/dist/turndown.js"></script>
   <script defer src="https://unpkg.com/turndown-plugin-gfm/dist/turndown-plugin-gfm.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script defer src="https://unpkg.com/lucide@latest"></script>
 
@@ -1601,7 +1602,25 @@
         }
       } catch (_) {}
       backendAvailable = false;
-      if (txt) txt.textContent = 'Browser Fallback Only (local-folio.bat)';
+      const isHostedStatic = window.location.protocol.startsWith('http') && !['localhost', '127.0.0.1'].includes(window.location.hostname);
+      if (isHostedStatic) {
+        deployLimits = {
+          online: true,
+          maxFiles: 5,
+          maxFileMb: 10,
+          maxFileBytes: 10 * 1024 * 1024,
+          offlineUrl: 'https://github.com/Dioscuri222/Local-Folio'
+        };
+        if (txt) txt.textContent = `Static Online Demo • Max ${deployLimits.maxFiles} files & <${deployLimits.maxFileMb} MB`;
+        const banner = document.getElementById('online-mode-banner');
+        const bannerTxt = document.getElementById('online-banner-text');
+        const bannerLink = document.getElementById('online-banner-download-link');
+        if (bannerTxt) bannerTxt.textContent = `Static Online Demo: Max ${deployLimits.maxFiles} files & under ${deployLimits.maxFileMb} MB per file (browser-side).`;
+        if (bannerLink) bannerLink.href = deployLimits.offlineUrl;
+        if (banner) { banner.classList.remove('hidden'); refreshIcons(); }
+      } else {
+        if (txt) txt.textContent = 'Browser Fallback Only (local-folio.bat)';
+      }
     }
 
     // ── #5 Expanding Label Tab Switcher ──────────────────────────────────────
@@ -2196,10 +2215,6 @@
     function addFilesToOcrQueue(fileList) {
       const files = Array.from(fileList || []);
       if (!files.length) return;
-      if (!backendAvailable) {
-        showToast('Run local-folio.bat for RapidOCR engine', 'warning');
-        return;
-      }
 
       const isOcrBatchDone = ocrQueue.length > 0 && !isOcrProcessing && ocrQueue.every(i => i.status === 'done' || i.status === 'error');
       const startedNew = settings.autoNewSession && isOcrBatchDone;
@@ -2282,19 +2297,50 @@
           }
 
           try {
-            const fd = new FormData();
-            fd.append('file', item.file);
-            fd.append('rotate', ocrRotateSelect.value);
-            fd.append('job_id', jobId);
-            const res = await fetch(`${API_BASE}/api/ocr`, { method: 'POST', body: fd, signal: activeAbortController.signal });
-            const data = await res.json();
-            if (!res.ok || data.error) throw new Error(data.error || `OCR failed (${res.status})`);
+            if (!backendAvailable) {
+              if (!window.Tesseract) throw new Error('Tesseract.js is still loading, please retry in a moment.');
+              const lang = settings.ocrLang || 'eng+ind';
+              let outText = '';
+              if (item.file.name.toLowerCase().endsWith('.pdf')) {
+                if (!window.pdfjsLib) throw new Error('PDF.js not loaded');
+                const pdf = await pdfjsLib.getDocument({ data: await item.file.arrayBuffer() }).promise;
+                const pageTexts = [];
+                for (let p = 1; p <= pdf.numPages; p++) {
+                  if (cancelOcrRequested) throw new DOMException('Cancelled', 'AbortError');
+                  const pg = await pdf.getPage(p);
+                  const vp = pg.getViewport({ scale: 1.5 });
+                  const cv = document.createElement('canvas');
+                  cv.width = Math.max(1, Math.floor(vp.width));
+                  cv.height = Math.max(1, Math.floor(vp.height));
+                  await pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+                  const r = await Tesseract.recognize(cv, lang);
+                  pageTexts.push(`--- Page ${p} ---\n${(r.data.text || '').trim()}`);
+                }
+                outText = pageTexts.join('\n\n');
+              } else {
+                const r = await Tesseract.recognize(item.file, lang);
+                outText = (r.data.text || '').trim();
+              }
+              item.text = outText;
+              item.lineCount = outText ? outText.split('\n').length : 0;
+              item.confidence = 0;
+              item.rotation = 0;
+              item.status = 'done';
+            } else {
+              const fd = new FormData();
+              fd.append('file', item.file);
+              fd.append('rotate', ocrRotateSelect.value);
+              fd.append('job_id', jobId);
+              const res = await fetch(`${API_BASE}/api/ocr`, { method: 'POST', body: fd, signal: activeAbortController.signal });
+              const data = await res.json();
+              if (!res.ok || data.error) throw new Error(data.error || `OCR failed (${res.status})`);
 
-            item.text = data.text || '';
-            item.lineCount = data.line_count || 0;
-            item.confidence = data.avg_confidence || 0;
-            item.rotation = data.rotation_applied || 0;
-            item.status = 'done';
+              item.text = data.text || '';
+              item.lineCount = data.line_count || 0;
+              item.confidence = data.avg_confidence || 0;
+              item.rotation = data.rotation_applied || 0;
+              item.status = 'done';
+            }
           } catch (err) {
             if (err.name === 'AbortError' || cancelOcrRequested) {
               item.status = 'error';
@@ -3638,9 +3684,213 @@
       renderPdfLivePreview();
     }
 
+    async function runClientSidePdfTool(toolId, files) {
+      const PDFLib = window.PDFLib;
+      if (!PDFLib) throw new Error('PDF-Lib is still loading, please retry.');
+      const { PDFDocument, degrees, rgb, StandardFonts } = PDFLib;
+      const clientSupported = ['merge', 'split', 'remove-pages', 'rotate', 'organize', 'from-images', 'to-images', 'to-markdown', 'watermark', 'page-numbers'];
+      if (!clientSupported.includes(toolId)) {
+        const meta = PDF_TOOLS_META[toolId] || { title: toolId };
+        showOnlineLimitModal(`${meta.title} requires the local Python/Office engine (LibreOffice, Ghostscript, RapidOCR, or pikepdf). Download the offline version to run all 29 PDF tools locally.`);
+        return null;
+      }
+
+      const stem = (files[0]?.name || 'document').replace(/\.[^/.]+$/, '');
+      const downloadBlob = (blob, filename) => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        return { blob, filename };
+      };
+
+      if (toolId === 'merge') {
+        const outDoc = await PDFDocument.create();
+        for (const f of files) {
+          const src = await PDFDocument.load(await f.arrayBuffer(), { ignoreEncryption: true });
+          const copied = await outDoc.copyPages(src, src.getPageIndices());
+          copied.forEach(p => outDoc.addPage(p));
+        }
+        return downloadBlob(new Blob([await outDoc.save()], { type: 'application/pdf' }), `${stem}_merged.pdf`);
+      }
+
+      if (toolId === 'from-images') {
+        const orient = getOptTileValue('img2pdf-orientation', 'portrait');
+        const pageSize = document.getElementById('pdf-from-img-size').value;
+        const margin = getOptTileValue('img2pdf-margin', 'none');
+        const mergeAll = document.getElementById('pdf-from-img-merge').checked;
+        const marginPt = margin === 'small' ? 28 : margin === 'big' ? 68 : 0;
+
+        const addImageToDoc = async (doc, f) => {
+          const bytes = new Uint8Array(await f.arrayBuffer());
+          let img;
+          const low = f.name.toLowerCase();
+          if (low.endsWith('.png')) img = await doc.embedPng(bytes);
+          else if (low.endsWith('.jpg') || low.endsWith('.jpeg')) img = await doc.embedJpg(bytes);
+          else {
+            const bmp = await createImageBitmap(f);
+            const cv = document.createElement('canvas');
+            cv.width = bmp.width; cv.height = bmp.height;
+            cv.getContext('2d').drawImage(bmp, 0, 0);
+            const pngBytes = await (await fetch(cv.toDataURL('image/png'))).arrayBuffer();
+            img = await doc.embedPng(pngBytes);
+          }
+          let pw, ph;
+          if (pageSize === 'a4') { pw = 595.28; ph = 841.89; }
+          else if (pageSize === 'letter') { pw = 612; ph = 792; }
+          else { pw = img.width + marginPt * 2; ph = img.height + marginPt * 2; }
+          if (orient === 'landscape' && ph > pw) [pw, ph] = [ph, pw];
+          if (orient === 'portrait' && pw > ph && pageSize !== 'fit') [pw, ph] = [ph, pw];
+          const pg = doc.addPage([pw, ph]);
+          const maxW = Math.max(10, pw - marginPt * 2);
+          const maxH = Math.max(10, ph - marginPt * 2);
+          const scale = Math.min(maxW / img.width, maxH / img.height);
+          const dw = img.width * scale, dh = img.height * scale;
+          pg.drawImage(img, { x: (pw - dw) / 2, y: (ph - dh) / 2, width: dw, height: dh });
+        };
+
+        if (mergeAll || files.length === 1) {
+          const doc = await PDFDocument.create();
+          for (const f of files) await addImageToDoc(doc, f);
+          return downloadBlob(new Blob([await doc.save()], { type: 'application/pdf' }), `${stem}_images.pdf`);
+        } else {
+          const zip = new JSZip();
+          for (const f of files) {
+            const doc = await PDFDocument.create();
+            await addImageToDoc(doc, f);
+            zip.file(`${f.name.replace(/\.[^/.]+$/, '')}.pdf`, await doc.save());
+          }
+          return downloadBlob(await zip.generateAsync({ type: 'blob' }), `${stem}_images_pdfs.zip`);
+        }
+      }
+
+      // Single-PDF client-side tools (supports batch via caller)
+      const f = files[0];
+      const srcBytes = await f.arrayBuffer();
+
+      if (toolId === 'to-images') {
+        const pdf = await pdfjsLib.getDocument({ data: srcBytes }).promise;
+        const fmt = document.getElementById('pdf-img-format').value;
+        const dpi = Number(document.getElementById('pdf-img-dpi').value || 150);
+        const picked = parsePageRangeClient(document.getElementById('pdf-img-pages').value, pdf.numPages);
+        const pageNums = picked.size ? Array.from(picked).sort((a, b) => a - b) : Array.from({ length: pdf.numPages }, (_, i) => i + 1);
+        const zip = new JSZip();
+        for (const pNum of pageNums) {
+          const pg = await pdf.getPage(pNum);
+          const vp = pg.getViewport({ scale: dpi / 72 });
+          const cv = document.createElement('canvas');
+          cv.width = Math.max(1, Math.floor(vp.width)); cv.height = Math.max(1, Math.floor(vp.height));
+          await pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+          const mime = fmt === 'png' ? 'image/png' : 'image/jpeg';
+          const blob = await new Promise(res => cv.toBlob(res, mime, 0.92));
+          zip.file(`${stem}_page_${String(pNum).padStart(3, '0')}.${fmt}`, blob);
+        }
+        return downloadBlob(await zip.generateAsync({ type: 'blob' }), `${stem}_images.zip`);
+      }
+
+      if (toolId === 'to-markdown') {
+        const pdf = await pdfjsLib.getDocument({ data: srcBytes }).promise;
+        const parts = [`# ${stem}\n`];
+        for (let p = 1; p <= pdf.numPages; p++) {
+          const pg = await pdf.getPage(p);
+          const tc = await pg.getTextContent();
+          parts.push(`## Page ${p}\n\n${tc.items.map(it => it.str).join(' ')}\n`);
+        }
+        return downloadBlob(new Blob([parts.join('\n')], { type: 'text/markdown;charset=utf-8' }), `${stem}.md`);
+      }
+
+      const doc = await PDFDocument.load(srcBytes, { ignoreEncryption: true });
+      const total = doc.getPageCount();
+
+      if (toolId === 'split') {
+        const picked = parsePageRangeClient(document.getElementById('pdf-split-pages').value, total);
+        const mode = document.getElementById('pdf-split-mode').value;
+        const pageNums = picked.size ? Array.from(picked).sort((a, b) => a - b) : Array.from({ length: total }, (_, i) => i + 1);
+        if (mode === 'each') {
+          const zip = new JSZip();
+          for (const pNum of pageNums) {
+            const sub = await PDFDocument.create();
+            const [cp] = await sub.copyPages(doc, [pNum - 1]);
+            sub.addPage(cp);
+            zip.file(`${stem}_page_${pNum}.pdf`, await sub.save());
+          }
+          return downloadBlob(await zip.generateAsync({ type: 'blob' }), `${stem}_split.zip`);
+        } else {
+          const sub = await PDFDocument.create();
+          const copied = await sub.copyPages(doc, pageNums.map(n => n - 1));
+          copied.forEach(p => sub.addPage(p));
+          return downloadBlob(new Blob([await sub.save()], { type: 'application/pdf' }), `${stem}_split.pdf`);
+        }
+      }
+
+      if (toolId === 'remove-pages') {
+        const rm = parsePageRangeClient(document.getElementById('pdf-remove-pages-input').value, total);
+        if (!rm.size) throw new Error('Enter page numbers to remove.');
+        const keep = Array.from({ length: total }, (_, i) => i).filter(idx => !rm.has(idx + 1));
+        if (!keep.length) throw new Error('Cannot remove all pages.');
+        const sub = await PDFDocument.create();
+        (await sub.copyPages(doc, keep)).forEach(p => sub.addPage(p));
+        return downloadBlob(new Blob([await sub.save()], { type: 'application/pdf' }), `${stem}_trimmed.pdf`);
+      }
+
+      if (toolId === 'organize') {
+        const ord = parsePageOrderClient(document.getElementById('pdf-organize-order').value, total);
+        if (!ord.length) throw new Error('Enter page order (e.g. 3, 1, 2 or reverse).');
+        const sub = await PDFDocument.create();
+        (await sub.copyPages(doc, ord.map(n => n - 1))).forEach(p => sub.addPage(p));
+        return downloadBlob(new Blob([await sub.save()], { type: 'application/pdf' }), `${stem}_organized.pdf`);
+      }
+
+      if (toolId === 'rotate') {
+        const angle = Number(document.getElementById('pdf-rotate-angle').value || 90);
+        const picked = parsePageRangeClient(document.getElementById('pdf-rotate-pages').value, total);
+        doc.getPages().forEach((pg, idx) => {
+          if (!picked.size || picked.has(idx + 1)) {
+            pg.setRotation(degrees((pg.getRotation().angle + angle) % 360));
+          }
+        });
+        return downloadBlob(new Blob([await doc.save()], { type: 'application/pdf' }), `${stem}_rotated.pdf`);
+      }
+
+      if (toolId === 'watermark') {
+        const text = document.getElementById('pdf-wm-text').value || 'CONFIDENTIAL';
+        const opacity = Number(document.getElementById('pdf-wm-opacity').value || 0.25);
+        const angle = Number(document.getElementById('pdf-wm-angle').value || 45);
+        const size = Number(document.getElementById('pdf-wm-size').value || 44);
+        const pos = document.getElementById('pdf-wm-pos').value;
+        const font = await doc.embedFont(StandardFonts.HelveticaBold);
+        doc.getPages().forEach(pg => {
+          const { width, height } = pg.getSize();
+          const tw = font.widthOfTextAtSize(text, size);
+          const y = pos === 'top' ? height * 0.85 : pos === 'bottom' ? height * 0.15 : height * 0.5;
+          pg.drawText(text, { x: Math.max(20, (width - tw) / 2), y, size, font, color: rgb(0.35, 0.24, 0.16), opacity, rotate: degrees(angle) });
+        });
+        return downloadBlob(new Blob([await doc.save()], { type: 'application/pdf' }), `${stem}_watermarked.pdf`);
+      }
+
+      if (toolId === 'page-numbers') {
+        const pos = document.getElementById('pdf-pn-pos').value;
+        const fmt = document.getElementById('pdf-pn-fmt').value;
+        const startNum = Number(document.getElementById('pdf-pn-start').value || 1);
+        const size = Number(document.getElementById('pdf-pn-size').value || 11);
+        const font = await doc.embedFont(StandardFonts.Helvetica);
+        doc.getPages().forEach((pg, idx) => {
+          const { width, height } = pg.getSize();
+          const num = startNum + idx;
+          const totalDisp = startNum + total - 1;
+          const lbl = fmt === 'simple' ? `${num}` : fmt === 'slash' ? `${num} / ${totalDisp}` : `Page ${num} of ${totalDisp}`;
+          const tw = font.widthOfTextAtSize(lbl, size);
+          const x = pos.includes('left') ? 24 : pos.includes('right') ? Math.max(24, width - tw - 24) : (width - tw) / 2;
+          const y = pos.startsWith('top') ? height - 28 : 20;
+          pg.drawText(lbl, { x, y, size, font, color: rgb(0.23, 0.17, 0.13) });
+        });
+        return downloadBlob(new Blob([await doc.save()], { type: 'application/pdf' }), `${stem}_numbered.pdf`);
+      }
+      return null;
+    }
+
     async function runActivePdfTool() {
       if (pdfIsRunning) return; // Prevent duplicate concurrent API calls
-      if (!backendAvailable) { showToast('Run local-folio.bat to use local PDF Tools', 'warning'); return; }
       const meta = PDF_TOOLS_META[activePdfTool];
       const htmlUrl = (document.getElementById('pdf-html-url')?.value || '').trim();
       if (!pdfSelectedFiles.length && !(meta.optionalFile && htmlUrl)) {
@@ -3649,6 +3899,50 @@
       }
       if ((activePdfTool === 'merge' || activePdfTool === 'compare') && pdfSelectedFiles.length < 2) {
         showToast(`Select at least 2 PDF files for ${meta.title}`, 'warning');
+        return;
+      }
+
+      if (!backendAvailable) {
+        pdfIsRunning = true;
+        try {
+          const multiFieldTools = ['merge', 'from-images', 'compare', 'workflow'];
+          if (multiFieldTools.includes(activePdfTool)) {
+            const res = await runClientSidePdfTool(activePdfTool, pdfSelectedFiles);
+            if (res) {
+              pdfResultInfo.textContent = `Downloaded ${res.filename} (${formatBytes(res.blob.size)})`;
+              pdfSessionCompleted = true;
+              showToast(`Saved successfully: ${res.filename}`, 'success');
+            }
+          } else {
+            const outputs = [];
+            for (const f of pdfSelectedFiles) {
+              const res = await runClientSidePdfTool(activePdfTool, [f]);
+              if (!res) return;
+              outputs.push(res);
+            }
+            if (outputs.length > 1) {
+              const zip = new JSZip();
+              outputs.forEach(o => zip.file(o.filename, o.blob));
+              const zipBlob = await zip.generateAsync({ type: 'blob' });
+              const zipName = `local-folio_${activePdfTool}_batch_${outputs.length}-files.zip`;
+              const a = document.createElement('a');
+              a.href = URL.createObjectURL(zipBlob);
+              a.download = zipName;
+              a.click();
+              pdfResultInfo.textContent = `Downloaded ${zipName} (${outputs.length} files)`;
+              showToast(`Batch done: ${outputs.length} files saved as .ZIP`, 'success');
+            } else if (outputs[0]) {
+              pdfResultInfo.textContent = `Downloaded ${outputs[0].filename} (${formatBytes(outputs[0].blob.size)})`;
+              showToast(`Saved successfully: ${outputs[0].filename}`, 'success');
+            }
+            pdfSessionCompleted = true;
+          }
+        } catch (err) {
+          pdfResultInfo.textContent = `Error: ${err.message}`;
+          showToast(err.message, 'error');
+        } finally {
+          pdfIsRunning = false;
+        }
         return;
       }
 
