@@ -4,11 +4,12 @@ __pycache__/
 *$py.class
 *.so
 
-# Virtual environments
+# Virtual environments & portable Python runtime
 .venv/
 venv/
 ENV/
 env/
+python-portable/
 
 # Environment & secrets
 .env

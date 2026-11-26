@@ -4,8 +4,8 @@
 
 ## Download & Try Online
 
-- **One-Click Offline Download (Unlimited, GPU-Accelerated):**
-  **[Download `Local-Folio-Offline.zip` [(Latest Release)](https://github.com/Dioscuri222/Local-Folio/archive/refs/tags/v1.zip)** — Extract the `.zip` and double-click **`local-folio.bat`** on Windows (auto-installs Python dependencies on first run).
+- **One-Click Offline Download (Unlimited, GPU-Accelerated, Zero-Setup):**
+  **[Download `Local-Folio-Offline.zip` (Latest Release)](https://github.com/Dioscuri222/Local-Folio/releases/latest/download/Local-Folio-Offline.zip)** — Extract the `.zip` and double-click **`local-folio.bat`** on Windows (auto-downloads Portable Python 3.12 if Python is not installed, then installs dependencies on first run).
 - **All Releases:** [GitHub Releases](https://github.com/Dioscuri222/Local-Folio/releases)
 - **Try Online Demo (No Install):** [Hugging Face Static Space](https://huggingface.co/spaces/Dioscuri222/local-folio) *(limited to 5 files & <10 MB per file; browser-side tools only)*
 
