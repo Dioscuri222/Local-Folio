@@ -2,7 +2,7 @@
 title Local-Folio - Local PDF, RapidOCR ^& MarkItDown Studio
 cd /d "%~dp0"
 
-python -c "import fastapi, uvicorn, rapidocr_onnxruntime, pymupdf" >nul 2>&1
+python -c "import importlib.util as u, sys; sys.exit(0 if all(u.find_spec(m) for m in ('fastapi','uvicorn','pymupdf','pdf2docx')) and (u.find_spec('rapidocr_onnxruntime') or u.find_spec('rapidocr')) else 1)" >nul 2>&1
 if errorlevel 1 (
     echo First-time setup: installing Local-Folio dependencies...
     python -m pip install -r requirements.txt

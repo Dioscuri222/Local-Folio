@@ -18,7 +18,15 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from markitdown import MarkItDown
 from PIL import Image, ImageOps
 from pypdf import PdfReader, PdfWriter
-from rapidocr_onnxruntime import RapidOCR
+
+try:
+    from rapidocr_onnxruntime import RapidOCR
+
+    _RAPIDOCR_V1 = True
+except ImportError:
+    from rapidocr import RapidOCR  # type: ignore
+
+    _RAPIDOCR_V1 = False
 
 APP_DIR = Path(__file__).resolve().parent
 HTML_PATH = APP_DIR / "local-folio.html"
@@ -167,7 +175,7 @@ def get_ocr_engine() -> RapidOCR:
             providers = []
 
         # 1. Try NVIDIA CUDA GPU if onnxruntime-gpu + CUDA/cuDNN are available
-        if "CUDAExecutionProvider" in providers:
+        if _RAPIDOCR_V1 and "CUDAExecutionProvider" in providers:
             try:
                 engine = RapidOCR(det_use_cuda=True, cls_use_cuda=True, rec_use_cuda=True)
                 det_eps = engine.text_det.infer.session.get_providers()
@@ -179,7 +187,7 @@ def get_ocr_engine() -> RapidOCR:
                 print(f"[Local-Folio] CUDA GPU init skipped ({exc}); trying fallback...")
 
         # 2. Try Windows DirectML GPU (works on NVIDIA, AMD, and Intel GPUs via DirectX 12)
-        if "DmlExecutionProvider" in providers:
+        if _RAPIDOCR_V1 and "DmlExecutionProvider" in providers:
             try:
                 engine = RapidOCR(det_use_dml=True, cls_use_dml=True, rec_use_dml=True)
                 det_eps = engine.text_det.infer.session.get_providers()
@@ -269,6 +277,20 @@ def _is_nearly_blank(img: Image.Image) -> bool:
     return float(arr.std()) < 4.0
 
 
+def _call_ocr_engine(engine, arr: np.ndarray) -> List[Tuple]:
+    """Normalize output across rapidocr-onnxruntime v1.x and rapidocr v3.x (Python 3.13+)."""
+    out = engine(arr)
+    if isinstance(out, tuple) and len(out) == 2:
+        res = out[0]
+        return list(res) if res else []
+    boxes = getattr(out, "boxes", None)
+    txts = getattr(out, "txts", None)
+    scores = getattr(out, "scores", None)
+    if boxes is not None and txts is not None and scores is not None:
+        return list(zip(boxes, txts, scores))
+    return []
+
+
 def run_rapidocr_on_image(
     img: Image.Image,
     rotate_mode: str = "auto",
@@ -285,13 +307,13 @@ def run_rapidocr_on_image(
         deg = int(rotate_mode)
         rotated = base_img.rotate(-deg, expand=True) if deg else base_img
         with _ocr_infer_lock:
-            res, _ = engine(np.array(rotated))
+            res = _call_ocr_engine(engine, np.array(rotated))
         _, lines, avg_conf = _score_ocr_result(res)
         return "\n".join(lines), deg, avg_conf, len(lines)
 
     # Auto mode: test 0 deg first; only retry rotated orientations if boxes are vertical or very weak
     with _ocr_infer_lock:
-        res0, _ = engine(np.array(base_img))
+        res0 = _call_ocr_engine(engine, np.array(base_img))
     best_score, best_lines, best_conf = _score_ocr_result(res0)
     best_deg = 0
 
@@ -315,7 +337,7 @@ def run_rapidocr_on_image(
         for deg in (90, 270, 180):
             rotated = base_img.rotate(-deg, expand=True)
             with _ocr_infer_lock:
-                res, _ = engine(np.array(rotated))
+                res = _call_ocr_engine(engine, np.array(rotated))
             score, lines, conf = _score_ocr_result(res)
             if score > best_score * 1.08:
                 best_score, best_lines, best_conf, best_deg = score, lines, conf, deg
