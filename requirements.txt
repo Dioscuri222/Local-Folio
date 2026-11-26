@@ -6,8 +6,11 @@ python-multipart>=0.0.12
 # Document-to-Markdown Engine (External PyPI Dependency)
 markitdown[all]>=0.1.0
 
-# Local OCR Engine (Baidu PaddleOCR ONNX — auto-accelerates on DirectML/CUDA GPU when installed)
-rapidocr-onnxruntime>=1.4.0
+# Local OCR Engine (Baidu PaddleOCR ONNX — supports Python 3.10 through 3.14+)
+# Python <= 3.12 uses rapidocr-onnxruntime; Python 3.13+ uses the unified rapidocr v3 + onnxruntime
+rapidocr-onnxruntime>=1.4.0; python_version < "3.13"
+rapidocr>=3.0.0; python_version >= "3.13"
+onnxruntime>=1.19.0; python_version >= "3.13"
 # Optional GPU acceleration on Windows (NVIDIA / AMD / Intel DirectX 12):
 #   pip uninstall -y onnxruntime && pip install onnxruntime-directml
 
