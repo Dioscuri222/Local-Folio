@@ -1519,9 +1519,9 @@
         </div>`).join('');
     }
 
-    // ── Internal Drag-and-Drop Reorder Engine (Prevents Upload Overlay Trigger) ─
+    // ── Pointer-Based Drag-and-Drop Reorder Engine (Never Triggers OS File Upload Overlay) ─
     let internalDragActive = false;
-    let activeSortState = null; // { group, fromIdx }
+    let activeSortState = null; // { group, fromIdx, el, onMove, startX, startY, dragging, overIdx, overEl }
 
     function moveArrayItem(arr, fromIdx, toIdx) {
       if (fromIdx === toIdx || fromIdx < 0 || toIdx < 0 || fromIdx >= arr.length || toIdx >= arr.length) return false;
@@ -1532,45 +1532,88 @@
 
     function wireSortableCard(el, idx, total, groupKey, onMove) {
       el.querySelectorAll('img').forEach(im => { im.draggable = false; });
+      el.draggable = false;
       if (total <= 1) return;
-      el.draggable = true;
-      el.classList.add('cursor-grab', 'active:cursor-grabbing');
-      el.addEventListener('dragstart', (e) => {
+      el.dataset.sortGroup = groupKey;
+      el.dataset.sortIdx = String(idx);
+      el.classList.add('cursor-grab', 'active:cursor-grabbing', 'select-none');
+      el.style.touchAction = 'pan-y';
+
+      el.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        if (e.target.closest('button, input, select, textarea, a')) return;
         internalDragActive = true;
-        activeSortState = { group: groupKey, fromIdx: idx };
-        el.classList.add('opacity-45');
-        if (e.dataTransfer) {
-          e.dataTransfer.effectAllowed = 'move';
-          try { e.dataTransfer.setData('text/plain', String(idx)); } catch (_) {}
-        }
-      });
-      el.addEventListener('dragend', () => {
-        internalDragActive = false;
-        activeSortState = null;
-        el.classList.remove('opacity-45');
-        document.querySelectorAll('.sortable-drag-over').forEach(n => n.classList.remove('sortable-drag-over'));
-      });
-      el.addEventListener('dragover', (e) => {
-        if (!activeSortState || activeSortState.group !== groupKey || activeSortState.fromIdx === idx) return;
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-        el.classList.add('sortable-drag-over');
-      });
-      el.addEventListener('dragleave', () => {
-        el.classList.remove('sortable-drag-over');
-      });
-      el.addEventListener('drop', (e) => {
-        if (!activeSortState || activeSortState.group !== groupKey) return;
-        e.preventDefault();
-        e.stopPropagation();
-        el.classList.remove('sortable-drag-over');
-        const fromIdx = activeSortState.fromIdx;
-        activeSortState = null;
-        internalDragActive = false;
-        if (fromIdx !== idx) onMove(fromIdx, idx);
+        activeSortState = {
+          group: groupKey,
+          fromIdx: idx,
+          el,
+          onMove,
+          startX: e.clientX,
+          startY: e.clientY,
+          dragging: false,
+          overIdx: null,
+          overEl: null
+        };
       });
     }
+
+    // Global pointermove / pointerup listeners for smooth card reordering
+    window.addEventListener('pointermove', (e) => {
+      if (!activeSortState) return;
+      const st = activeSortState;
+      const dx = e.clientX - st.startX;
+      const dy = e.clientY - st.startY;
+      if (!st.dragging) {
+        if (Math.hypot(dx, dy) < 6) return;
+        st.dragging = true;
+        st.el.classList.add('opacity-50', 'ring-2', 'ring-[var(--accent)]');
+        document.body.style.userSelect = 'none';
+        document.body.style.cursor = 'grabbing';
+      }
+      e.preventDefault();
+      st.el.style.transform = `translate(${dx}px, ${dy}px)`;
+      st.el.style.zIndex = '40';
+      st.el.style.pointerEvents = 'none';
+      const under = document.elementFromPoint(e.clientX, e.clientY);
+      st.el.style.pointerEvents = '';
+      const targetCard = under ? under.closest(`[data-sort-group="${st.group}"]`) : null;
+      if (st.overEl && st.overEl !== targetCard) {
+        st.overEl.classList.remove('sortable-drag-over');
+      }
+      if (targetCard && targetCard !== st.el) {
+        targetCard.classList.add('sortable-drag-over');
+        st.overEl = targetCard;
+        st.overIdx = Number(targetCard.dataset.sortIdx);
+      } else {
+        st.overEl = null;
+        st.overIdx = null;
+      }
+    }, { passive: false });
+
+    function finishPointerSort() {
+      if (!activeSortState) return;
+      const st = activeSortState;
+      activeSortState = null;
+      internalDragActive = false;
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+      st.el.classList.remove('opacity-50', 'ring-2', 'ring-[var(--accent)]');
+      st.el.style.transform = '';
+      st.el.style.zIndex = '';
+      if (st.overEl) st.overEl.classList.remove('sortable-drag-over');
+      document.querySelectorAll('.sortable-drag-over').forEach(n => n.classList.remove('sortable-drag-over'));
+      if (st.dragging) {
+        // Suppress the trailing click event after releasing a drag so Zoom lightbox doesn't open
+        const swallowClick = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+        window.addEventListener('click', swallowClick, { capture: true, once: true });
+        setTimeout(() => window.removeEventListener('click', swallowClick, { capture: true }), 80);
+        if (st.overIdx !== null && !Number.isNaN(st.overIdx) && st.overIdx !== st.fromIdx) {
+          st.onMove(st.fromIdx, st.overIdx);
+        }
+      }
+    }
+    window.addEventListener('pointerup', finishPointerSort);
+    window.addEventListener('pointercancel', finishPointerSort);
 
     const settings = {
       autoNewSession: localStorage.getItem('folio-auto-new-session') !== 'false',
@@ -4626,16 +4669,17 @@
         }
       }
 
-      // Any drag started inside the document is an internal UI/reorder drag, NEVER an OS file upload
-      document.addEventListener('dragstart', () => {
+      // Block any native HTML5 dragstart originating from elements/images inside the page
+      // so dragging an image or card inside the browser can NEVER trigger the OS file upload overlay!
+      window.addEventListener('dragstart', (e) => {
         internalDragActive = true;
-      });
-      document.addEventListener('dragend', () => {
+        e.preventDefault();
+      }, true);
+      window.addEventListener('dragend', () => {
         internalDragActive = false;
-        activeSortState = null;
         dragDepth = 0;
         overlay.classList.add('hidden');
-      });
+      }, true);
 
       window.addEventListener('dragenter', (e) => {
         if (internalDragActive || activeSortState) return;
