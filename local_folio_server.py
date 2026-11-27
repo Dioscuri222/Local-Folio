@@ -377,7 +377,7 @@ def iter_pdf_pages_pil(pdf_bytes: bytes, scale: float = 1.5):
 
 
 def parse_page_ranges(range_str: str, total_pages: int) -> List[int]:
-    """Parse 1-based page range string like '1-3, 5, 7-9' into sorted 0-based indices."""
+    """Parse 1-based page range string like '1-3, 5, 9-7' into ordered 0-based indices."""
     indices: List[int] = []
     seen = set()
     for part in range_str.split(","):
@@ -386,9 +386,10 @@ def parse_page_ranges(range_str: str, total_pages: int) -> List[int]:
             continue
         if "-" in token:
             start_s, end_s = token.split("-", 1)
-            start = max(1, int(start_s.strip()))
-            end = min(total_pages, int(end_s.strip()))
-            for p in range(start, end + 1):
+            start = max(1, min(total_pages, int(start_s.strip())))
+            end = max(1, min(total_pages, int(end_s.strip())))
+            step = 1 if start <= end else -1
+            for p in range(start, end + step, step):
                 if p - 1 not in seen:
                     seen.add(p - 1)
                     indices.append(p - 1)
